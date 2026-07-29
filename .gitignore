@@ -1,0 +1,32 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Python virtual e*vironments
+.venv/
+venv/
+
+# Environ*ent variables and secrets
+.env
+*.e*v
+
+# Test and coverage output
+.pyt*st_cache/
+.coverage
+htmlcov/
+
+# ID* configuration
+.vscode/
+.idea/
+
+# *perating system files
+.DS_Store
+Th*mbs.db
+
+# Logs
+*.log
+
+# Temporary *iles
+*.tmp
+*.swp
