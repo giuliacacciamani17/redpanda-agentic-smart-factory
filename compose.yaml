@@ -69,6 +69,27 @@ services:
       - factory-network
     restart: unless-stopped
 
+  maintenance-agent:
+    build:
+      context: ./maintenance-agent
+    container_name: maintenance-agent
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      TELEMETRY_TOPIC: factory.telemetry
+      COMMANDS_TOPIC: factory.commands
+      DECISIONS_TOPIC: factory.agent-decisions
+      CONSUMER_GROUP: maintenance-agent-group
+      AGENT_ID: maintenance-agent-01
+      STATE_WINDOW_SIZE: "5"
+    networks:
+      - factory-network
+    restart: unless-stopped
+
+
+
 volumes:
   redpanda-data:
 
