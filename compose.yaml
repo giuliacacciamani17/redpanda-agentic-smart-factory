@@ -52,7 +52,7 @@ services:
       - "8080:8080"
     networks:
       - factory-network
-  
+
   machine-simulator:
     build:
       context: ./machine-simulator
@@ -65,6 +65,7 @@ services:
       TELEMETRY_TOPIC: factory.telemetry
       MACHINE_ID: machine-01
       EVENT_INTERVAL_SECONDS: "2"
+      SIMULATION_MODE: SCENARIO
     networks:
       - factory-network
     restart: unless-stopped
@@ -76,6 +77,8 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+      machine-simulator:
+        condition: service_started
     environment:
       KAFKA_BROKER: redpanda:9092
       TELEMETRY_TOPIC: factory.telemetry
@@ -87,8 +90,6 @@ services:
     networks:
       - factory-network
     restart: unless-stopped
-
-
 
 volumes:
   redpanda-data:
