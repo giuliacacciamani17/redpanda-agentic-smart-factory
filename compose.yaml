@@ -65,7 +65,7 @@ services:
       TELEMETRY_TOPIC: factory.telemetry
       MACHINE_ID: machine-01
       EVENT_INTERVAL_SECONDS: "2"
-      SIMULATION_MODE: SCENARIO
+      SIMULATION_MODE: ANOMALY
     networks:
       - factory-network
     restart: unless-stopped
@@ -87,6 +87,25 @@ services:
       CONSUMER_GROUP: maintenance-agent-group
       AGENT_ID: maintenance-agent-01
       STATE_WINDOW_SIZE: "5"
+    networks:
+      - factory-network
+    restart: unless-stopped
+
+  machine-controller:
+    build:
+      context: ./machine-controller
+    container_name: machine-controller
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      maintenance-agent:
+        condition: service_started
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      COMMANDS_TOPIC: factory.commands
+      COMMAND_RESULTS_TOPIC: factory.command-results
+      CONSUMER_GROUP: machine-controller-group
+      CONTROLLER_ID: machine-controller-01
     networks:
       - factory-network
     restart: unless-stopped
