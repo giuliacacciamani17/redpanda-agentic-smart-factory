@@ -1,31 +1,63 @@
 import json
 import random
+import signal
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from confluent_kafka import Producer
 
 from config import (
+    CORRELATION_PREFIX,
+    CORRELATION_START,
     EVENT_INTERVAL_SECONDS,
     KAFKA_BROKER,
     MACHINE_ID,
-    SIMULATION_MODE,
+    RANDOM_SEED,
     TELEMETRY_TOPIC,
 )
 
 
-NORMAL_EVENTS = 6
-DEGRADING_EVENTS = 12
-CRITICAL_EVENTS = 4
-RECOVERY_EVENTS = 10
-
-CYCLE_LENGTH = (
-    NORMAL_EVENTS
-    + DEGRADING_EVENTS
-    + CRITICAL_EVENTS
-    + RECOVERY_EVENTS
+EVENT_PROFILES = (
+    {
+        "phase": "NORMAL",
+        "temperature": 60.0,
+        "vibration": 1.5,
+        "speed": 1400,
+        "energy_consumption": 95.0,
+    },
+    {
+        "phase": "MONITORING",
+        "temperature": 80.0,
+        "vibration": 5.5,
+        "speed": 1420,
+        "energy_consumption": 112.0,
+    },
+    {
+        "phase": "DEGRADING",
+        "temperature": 94.0,
+        "vibration": 6.9,
+        "speed": 1450,
+        "energy_consumption": 128.0,
+    },
+    {
+        "phase": "SEVERE",
+        "temperature": 100.0,
+        "vibration": 9.0,
+        "speed": 1470,
+        "energy_consumption": 140.0,
+    },
+    {
+        "phase": "CRITICAL",
+        "temperature": 105.0,
+        "vibration": 10.0,
+        "speed": 1500,
+        "energy_consumption": 150.0,
+    },
 )
+
+running = True
 
 
 def create_producer() -> Producer:
@@ -37,107 +69,71 @@ def create_producer() -> Producer:
     return Producer(configuration)
 
 
-def create_normal_measurements() -> dict:
+def generate_measurements(
+    profile: dict[str, Any],
+    random_generator: random.Random,
+) -> dict[str, Any]:
     return {
-        "temperature": round(random.uniform(57.0, 63.0), 2),
-        "vibration": round(random.uniform(1.0, 1.8), 2),
-        "speed": random.randint(1350, 1450),
-        "energy_consumption": round(
-            random.uniform(85.0, 105.0),
+        "temperature": round(
+            profile["temperature"]
+            + random_generator.uniform(-0.4, 0.4),
             2,
         ),
-        "phase": "NORMAL",
-    }
-
-
-def create_degrading_measurements(step: int) -> dict:
-    return {
-        "temperature": round(64.0 + step * 2.0, 2),
-        "vibration": round(1.8 + step * 0.42, 2),
-        "speed": random.randint(1350, 1450),
-        "energy_consumption": round(105.0 + step * 2.0, 2),
-        "phase": "DEGRADING",
-    }
-
-
-def create_critical_measurements() -> dict:
-    return {
-        "temperature": round(random.uniform(93.0, 97.0), 2),
-        "vibration": round(random.uniform(7.2, 8.0), 2),
-        "speed": random.randint(1400, 1500),
-        "energy_consumption": round(
-            random.uniform(130.0, 145.0),
+        "vibration": round(
+            profile["vibration"]
+            + random_generator.uniform(-0.08, 0.08),
             2,
         ),
-        "phase": "CRITICAL",
-    }
-
-
-def create_recovery_measurements(step: int) -> dict:
-    progress = step / RECOVERY_EVENTS
-
-    return {
-        "temperature": round(94.0 - progress * 34.0, 2),
-        "vibration": round(7.4 - progress * 5.9, 2),
-        "speed": round(900 + progress * 450),
+        "speed": profile["speed"]
+        + random_generator.randint(-10, 10),
         "energy_consumption": round(
-            130.0 - progress * 35.0,
+            profile["energy_consumption"]
+            + random_generator.uniform(-1.0, 1.0),
             2,
         ),
-        "phase": "RECOVERY",
+        "phase": profile["phase"],
     }
 
 
-def create_scenario_measurements(
-    event_number: int,
-) -> dict:
-    cycle_position = (event_number - 1) % CYCLE_LENGTH
+def create_correlation_id(
+    sequence_number: int,
+) -> str:
+    correlation_number = (
+        CORRELATION_START
+        + sequence_number
+        - 1
+    )
 
-    if cycle_position < NORMAL_EVENTS:
-        return create_normal_measurements()
-
-    cycle_position -= NORMAL_EVENTS
-
-    if cycle_position < DEGRADING_EVENTS:
-        return create_degrading_measurements(
-            cycle_position + 1
-        )
-
-    cycle_position -= DEGRADING_EVENTS
-
-    if cycle_position < CRITICAL_EVENTS:
-        return create_critical_measurements()
-
-    cycle_position -= CRITICAL_EVENTS
-
-    return create_recovery_measurements(
-        cycle_position + 1
+    return (
+        f"{CORRELATION_PREFIX}-"
+        f"{correlation_number}"
     )
 
 
-def create_measurements(event_number: int) -> dict:
-    if SIMULATION_MODE == "SCENARIO":
-        return create_scenario_measurements(event_number)
-
-    return create_normal_measurements()
-
-
 def create_telemetry_event(
-    event_number: int,
-) -> dict:
-    measurements = create_measurements(event_number)
-
+    measurements: dict[str, Any],
+    sequence_number: int,
+) -> dict[str, Any]:
     return {
         "event_id": str(uuid.uuid4()),
+        "correlation_id": create_correlation_id(
+            sequence_number
+        ),
         "machine_id": MACHINE_ID,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "sequence_number": sequence_number,
         **measurements,
         "status": "RUNNING",
-        "simulation_mode": SIMULATION_MODE,
+        "simulation_mode": "CONTROLLED_RANDOM",
     }
 
 
-def handle_delivery(error, message) -> None:
+def handle_delivery(
+    error,
+    message,
+) -> None:
     if error is not None:
         print(
             f"Errore durante la pubblicazione: {error}",
@@ -156,7 +152,7 @@ def handle_delivery(error, message) -> None:
 
 def publish_event(
     producer: Producer,
-    event: dict,
+    event: dict[str, Any],
 ) -> None:
     producer.produce(
         topic=TELEMETRY_TOPIC,
@@ -168,45 +164,107 @@ def publish_event(
     producer.poll(0)
 
 
+def handle_shutdown(
+    signum,
+    frame,
+) -> None:
+    del signum, frame
+
+    global running
+    running = False
+
+    print(
+        "Arresto del simulatore richiesto",
+        flush=True,
+    )
+
+
 def run_simulator() -> None:
     producer = create_producer()
-    event_number = 0
+    random_generator = random.Random(
+        RANDOM_SEED
+    )
 
-    print(f"Simulatore avviato per {MACHINE_ID}", flush=True)
-    print(f"Broker: {KAFKA_BROKER}", flush=True)
-    print(f"Topic: {TELEMETRY_TOPIC}", flush=True)
-    print(f"Modalità: {SIMULATION_MODE}", flush=True)
+    print(
+        f"Simulatore avviato per {MACHINE_ID}",
+        flush=True,
+    )
+    print(
+        f"Broker: {KAFKA_BROKER}",
+        flush=True,
+    )
+    print(
+        f"Topic: {TELEMETRY_TOPIC}",
+        flush=True,
+    )
+    print(
+        f"Eventi pianificati: {len(EVENT_PROFILES)}",
+        flush=True,
+    )
+    print(
+        f"Seed pseudocasuale: {RANDOM_SEED}",
+        flush=True,
+    )
 
     try:
-        while True:
-            event_number += 1
-            event = create_telemetry_event(event_number)
+        for sequence_number, profile in enumerate(
+            EVENT_PROFILES,
+            start=1,
+        ):
+            if not running:
+                break
 
-            publish_event(producer, event)
+            measurements = generate_measurements(
+                profile=profile,
+                random_generator=random_generator,
+            )
+
+            event = create_telemetry_event(
+                measurements=measurements,
+                sequence_number=sequence_number,
+            )
+
+            publish_event(
+                producer=producer,
+                event=event,
+            )
+
+            producer.flush(10)
 
             print(
-                f"Fase={event['phase']} "
+                f"Evento={sequence_number} "
+                f"correlation_id={event['correlation_id']} "
+                f"fase={event['phase']} "
                 f"temperatura={event['temperature']} "
                 f"vibrazione={event['vibration']}",
                 flush=True,
             )
 
-            time.sleep(EVENT_INTERVAL_SECONDS)
-
-    except KeyboardInterrupt:
-        print(
-            "Arresto del simulatore richiesto",
-            flush=True,
-        )
+            if sequence_number < len(EVENT_PROFILES):
+                time.sleep(EVENT_INTERVAL_SECONDS)
 
     finally:
-        producer.flush()
+        producer.flush(10)
 
         print(
-            "Simulatore arrestato correttamente",
+            "Simulazione completata: "
+            "5 eventi pubblicati",
             flush=True,
         )
+
+
+def main() -> None:
+    signal.signal(
+        signal.SIGINT,
+        handle_shutdown,
+    )
+    signal.signal(
+        signal.SIGTERM,
+        handle_shutdown,
+    )
+
+    run_simulator()
 
 
 if __name__ == "__main__":
-    run_simulator()
+    main()

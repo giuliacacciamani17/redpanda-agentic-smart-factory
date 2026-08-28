@@ -53,19 +53,19 @@ services:
     networks:
       - factory-network
 
-  machine-simulator:
+  machine-controller:
     build:
-      context: ./machine-simulator
-    container_name: machine-simulator
+      context: ./machine-controller
+    container_name: machine-controller
     depends_on:
       redpanda:
         condition: service_healthy
     environment:
       KAFKA_BROKER: redpanda:9092
-      TELEMETRY_TOPIC: factory.telemetry
-      MACHINE_ID: machine-01
-      EVENT_INTERVAL_SECONDS: "2"
-      SIMULATION_MODE: ANOMALY
+      COMMANDS_TOPIC: factory.commands
+      COMMAND_RESULTS_TOPIC: factory.command-results
+      CONSUMER_GROUP: machine-controller-group
+      CONTROLLER_ID: machine-controller-01
     networks:
       - factory-network
     restart: unless-stopped
@@ -77,7 +77,7 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
-      machine-simulator:
+      machine-controller:
         condition: service_started
     environment:
       KAFKA_BROKER: redpanda:9092
@@ -91,10 +91,10 @@ services:
       - factory-network
     restart: unless-stopped
 
-  machine-controller:
+  machine-simulator:
     build:
-      context: ./machine-controller
-    container_name: machine-controller
+      context: ./machine-simulator
+    container_name: machine-simulator
     depends_on:
       redpanda:
         condition: service_healthy
@@ -102,13 +102,15 @@ services:
         condition: service_started
     environment:
       KAFKA_BROKER: redpanda:9092
-      COMMANDS_TOPIC: factory.commands
-      COMMAND_RESULTS_TOPIC: factory.command-results
-      CONSUMER_GROUP: machine-controller-group
-      CONTROLLER_ID: machine-controller-01
+      TELEMETRY_TOPIC: factory.telemetry
+      MACHINE_ID: machine-01
+      EVENT_INTERVAL_SECONDS: "2"
+      #RANDOM_SEED: "42"
+      CORRELATION_PREFIX: abc
+      CORRELATION_START: "123"
     networks:
       - factory-network
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   redpanda-data:

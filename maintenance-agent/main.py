@@ -63,6 +63,7 @@ def deserialize_telemetry(
 
     required_fields = {
         "event_id",
+        "correlation_id",
         "machine_id",
         "timestamp",
         "temperature",
@@ -106,6 +107,7 @@ def create_decision_event(
         "agent_id": AGENT_ID,
         "source_event_id": telemetry["event_id"],
         "machine_id": telemetry["machine_id"],
+        "correlation_id": telemetry["correlation_id"],
         "timestamp": datetime.now(
             timezone.utc
         ).isoformat(),
@@ -139,6 +141,7 @@ def create_command_event(
     return {
         "command_id": str(uuid4()),
         "decision_id": decision["decision_id"],
+        "correlation_id": decision["correlation_id"],
         "agent_id": decision["agent_id"],
         "machine_id": decision["machine_id"],
         "timestamp": datetime.now(

@@ -20,7 +20,15 @@ EVENT_INTERVAL_SECONDS = float(
     os.getenv("EVENT_INTERVAL_SECONDS", "2")
 )
 
-SIMULATION_MODE = os.getenv(
-    "SIMULATION_MODE",
-    "NORMAL",
-).upper()
+RANDOM_SEED = int(
+    os.getenv("RANDOM_SEED", "42")
+)
+
+CORRELATION_PREFIX = os.getenv(
+    "CORRELATION_PREFIX",
+    "abc",
+)
+
+CORRELATION_START = int(
+    os.getenv("CORRELATION_START", "123")
+)

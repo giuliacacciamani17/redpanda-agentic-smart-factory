@@ -14,6 +14,14 @@ from config import (
 from controller import MachineController
 
 
+REQUIRED_COMMAND_FIELDS = {
+    "command_id",
+    "correlation_id",
+    "machine_id",
+    "action",
+}
+
+
 def create_consumer() -> Consumer:
     configuration = {
         "bootstrap.servers": KAFKA_BROKER,
@@ -32,6 +40,20 @@ def create_producer() -> Producer:
     }
 
     return Producer(configuration)
+
+
+def validate_command(command: dict) -> None:
+    missing_fields = REQUIRED_COMMAND_FIELDS - command.keys()
+
+    if missing_fields:
+        missing_fields_text = ", ".join(
+            sorted(missing_fields)
+        )
+
+        raise ValueError(
+            "Comando non valido. "
+            f"Campi mancanti: {missing_fields_text}"
+        )
 
 
 def handle_delivery(error, message) -> None:
@@ -59,6 +81,7 @@ def create_command_result(
         "result_id": str(uuid.uuid4()),
         "command_id": command["command_id"],
         "decision_id": command.get("decision_id"),
+        "correlation_id": command["correlation_id"],
         "controller_id": CONTROLLER_ID,
         "agent_id": command.get("agent_id"),
         "machine_id": command["machine_id"],
@@ -84,6 +107,43 @@ def publish_result(
     )
 
     producer.poll(0)
+
+
+def process_message(
+    message,
+    producer: Producer,
+    controller: MachineController,
+) -> None:
+    command = json.loads(
+        message.value().decode("utf-8")
+    )
+
+    validate_command(command)
+
+    execution_result = controller.execute_command(
+        command
+    )
+
+    command_result = create_command_result(
+        command,
+        execution_result,
+    )
+
+    publish_result(
+        producer,
+        command_result,
+    )
+
+    producer.flush()
+
+    print(
+        f"Macchina={command['machine_id']} "
+        f"azione={command['action']} "
+        f"risultato={execution_result['result']} "
+        f"stato={execution_result['machine_status']} "
+        f"correlation_id={command['correlation_id']}",
+        flush=True,
+    )
 
 
 def run_controller() -> None:
@@ -130,37 +190,28 @@ def run_controller() -> None:
                 )
                 continue
 
-            command = json.loads(
-                message.value().decode("utf-8")
-            )
+            try:
+                process_message(
+                    message,
+                    producer,
+                    controller,
+                )
 
-            execution_result = (
-                controller.execute_command(command)
-            )
+                consumer.commit(
+                    message=message,
+                    asynchronous=False,
+                )
 
-            command_result = create_command_result(
-                command,
-                execution_result,
-            )
-
-            publish_result(
-                producer,
-                command_result,
-            )
-
-            producer.flush()
-            consumer.commit(
-                message=message,
-                asynchronous=False,
-            )
-
-            print(
-                f"Macchina={command['machine_id']} "
-                f"azione={command['action']} "
-                f"risultato={execution_result['result']} "
-                f"stato={execution_result['machine_status']}",
-                flush=True,
-            )
+            except (
+                json.JSONDecodeError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as error:
+                print(
+                    f"Comando non elaborabile: {error}",
+                    flush=True,
+                )
 
     except KeyboardInterrupt:
         print(
