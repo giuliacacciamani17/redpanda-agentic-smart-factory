@@ -53,6 +53,46 @@ services:
     networks:
       - factory-network
 
+  machine-simulator:
+    build:
+      context: ./machine-simulator
+    container_name: machine-simulator
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      TELEMETRY_TOPIC: factory.telemetry
+      MACHINE_ID: machine-01
+      EVENT_INTERVAL_SECONDS: "2"
+      RANDOM_SEED: "42"
+      CORRELATION_PREFIX: abc
+      CORRELATION_START: "123"
+    networks:
+      - factory-network
+    restart: "no"
+
+  maintenance-agent:
+    build:
+      context: ./maintenance-agent
+    container_name: maintenance-agent
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      TELEMETRY_TOPIC: factory.telemetry
+      COMMANDS_TOPIC: factory.commands
+      COMMAND_RESULTS_TOPIC: factory.command-results
+      DECISIONS_TOPIC: factory.agent-decisions
+      AGENT_FEEDBACK_TOPIC: factory.agent-feedback
+      CONSUMER_GROUP: maintenance-agent-group
+      AGENT_ID: maintenance-agent-01
+      STATE_WINDOW_SIZE: "5"
+    networks:
+      - factory-network
+    restart: unless-stopped
+
   machine-controller:
     build:
       context: ./machine-controller
@@ -69,48 +109,6 @@ services:
     networks:
       - factory-network
     restart: unless-stopped
-
-  maintenance-agent:
-    build:
-      context: ./maintenance-agent
-    container_name: maintenance-agent
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      machine-controller:
-        condition: service_started
-    environment:
-      KAFKA_BROKER: redpanda:9092
-      TELEMETRY_TOPIC: factory.telemetry
-      COMMANDS_TOPIC: factory.commands
-      DECISIONS_TOPIC: factory.agent-decisions
-      CONSUMER_GROUP: maintenance-agent-group
-      AGENT_ID: maintenance-agent-01
-      STATE_WINDOW_SIZE: "5"
-    networks:
-      - factory-network
-    restart: unless-stopped
-
-  machine-simulator:
-    build:
-      context: ./machine-simulator
-    container_name: machine-simulator
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      maintenance-agent:
-        condition: service_started
-    environment:
-      KAFKA_BROKER: redpanda:9092
-      TELEMETRY_TOPIC: factory.telemetry
-      MACHINE_ID: machine-01
-      EVENT_INTERVAL_SECONDS: "2"
-      #RANDOM_SEED: "42"
-      CORRELATION_PREFIX: abc
-      CORRELATION_START: "123"
-    networks:
-      - factory-network
-    restart: "no"
 
 volumes:
   redpanda-data:

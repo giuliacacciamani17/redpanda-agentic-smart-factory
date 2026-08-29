@@ -12,7 +12,9 @@ from confluent_kafka import (
 )
 
 from config import (
+    AGENT_FEEDBACK_TOPIC,
     AGENT_ID,
+    COMMAND_RESULTS_TOPIC,
     COMMANDS_TOPIC,
     CONSUMER_GROUP,
     DECISIONS_TOPIC,
@@ -54,12 +56,36 @@ def create_producer() -> Producer:
     return Producer(configuration)
 
 
+def deserialize_json(
+    message_value: bytes,
+) -> dict[str, Any]:
+    return json.loads(
+        message_value.decode("utf-8")
+    )
+
+
+def validate_required_fields(
+    event: dict[str, Any],
+    required_fields: set[str],
+) -> None:
+    missing_fields = required_fields - event.keys()
+
+    if not missing_fields:
+        return
+
+    missing_names = ", ".join(
+        sorted(missing_fields)
+    )
+
+    raise ValueError(
+        f"Campi mancanti: {missing_names}"
+    )
+
+
 def deserialize_telemetry(
     message_value: bytes,
 ) -> dict[str, Any]:
-    telemetry = json.loads(
-        message_value.decode("utf-8")
-    )
+    telemetry = deserialize_json(message_value)
 
     required_fields = {
         "event_id",
@@ -70,18 +96,37 @@ def deserialize_telemetry(
         "vibration",
     }
 
-    missing_fields = required_fields - telemetry.keys()
-
-    if missing_fields:
-        missing_names = ", ".join(
-            sorted(missing_fields)
-        )
-
-        raise ValueError(
-            f"Campi mancanti: {missing_names}"
-        )
+    validate_required_fields(
+        event=telemetry,
+        required_fields=required_fields,
+    )
 
     return telemetry
+
+
+def deserialize_command_result(
+    message_value: bytes,
+) -> dict[str, Any]:
+    command_result = deserialize_json(
+        message_value
+    )
+
+    required_fields = {
+        "result_id",
+        "command_id",
+        "decision_id",
+        "correlation_id",
+        "machine_id",
+        "action",
+        "result",
+    }
+
+    validate_required_fields(
+        event=command_result,
+        required_fields=required_fields,
+    )
+
+    return command_result
 
 
 def get_machine_state(
@@ -106,8 +151,10 @@ def create_decision_event(
         "decision_id": str(uuid4()),
         "agent_id": AGENT_ID,
         "source_event_id": telemetry["event_id"],
+        "correlation_id": telemetry[
+            "correlation_id"
+        ],
         "machine_id": telemetry["machine_id"],
-        "correlation_id": telemetry["correlation_id"],
         "timestamp": datetime.now(
             timezone.utc
         ).isoformat(),
@@ -141,7 +188,9 @@ def create_command_event(
     return {
         "command_id": str(uuid4()),
         "decision_id": decision["decision_id"],
-        "correlation_id": decision["correlation_id"],
+        "correlation_id": decision[
+            "correlation_id"
+        ],
         "agent_id": decision["agent_id"],
         "machine_id": decision["machine_id"],
         "timestamp": datetime.now(
@@ -213,7 +262,7 @@ def process_telemetry(
     machine_id = telemetry["machine_id"]
     state = get_machine_state(machine_id)
 
-    state.update(telemetry)
+    state.update_telemetry(telemetry)
 
     risk_score = calculate_risk(state)
     action = select_action(risk_score)
@@ -246,14 +295,110 @@ def process_telemetry(
         )
 
     print(
-        f"Macchina={machine_id} "
+        f"Telemetria elaborata "
+        f"correlation_id="
+        f"{telemetry['correlation_id']} "
+        f"macchina={machine_id} "
         f"rischio={risk_score:.2f} "
-        f"azione_precedente={state.last_action} "
+        f"azione_precedente="
+        f"{state.last_action} "
         f"azione_selezionata={action}",
         flush=True,
     )
 
     state.last_action = action
+
+def create_feedback_event(
+    command_result: dict[str, Any],
+    state: MachineState,
+) -> dict[str, Any]:
+    return {
+        "feedback_id": str(uuid4()),
+        "agent_id": AGENT_ID,
+        "result_id": command_result["result_id"],
+        "command_id": command_result["command_id"],
+        "decision_id": command_result["decision_id"],
+        "correlation_id": command_result[
+            "correlation_id"
+        ],
+        "machine_id": command_result["machine_id"],
+        "timestamp": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "action": command_result["action"],
+        "command_result": command_result["result"],
+        "machine_status": state.machine_status,
+        "feedback_status": "PROCESSED",
+        "message": (
+            "The agent received the command result "
+            "and updated its internal state"
+        ),
+    }
+
+
+def process_command_result(
+    command_result: dict[str, Any],
+    producer: Producer,
+) -> None:
+    machine_id = command_result["machine_id"]
+    state = get_machine_state(machine_id)
+
+    state.update_command_result(command_result)
+
+    feedback = create_feedback_event(
+        command_result=command_result,
+        state=state,
+    )
+
+    publish_event(
+        producer=producer,
+        topic=AGENT_FEEDBACK_TOPIC,
+        machine_id=machine_id,
+        event=feedback,
+    )
+
+    print(
+        f"Feedback pubblicato "
+        f"correlation_id="
+        f"{command_result['correlation_id']} "
+        f"macchina={machine_id} "
+        f"azione={command_result['action']} "
+        f"risultato={command_result['result']} "
+        f"stato={state.machine_status}",
+        flush=True,
+    )
+
+
+def process_message(
+    topic: str,
+    message_value: bytes,
+    producer: Producer,
+) -> None:
+    if topic == TELEMETRY_TOPIC:
+        telemetry = deserialize_telemetry(
+            message_value
+        )
+
+        process_telemetry(
+            telemetry=telemetry,
+            producer=producer,
+        )
+        return
+
+    if topic == COMMAND_RESULTS_TOPIC:
+        command_result = deserialize_command_result(
+            message_value
+        )
+
+        process_command_result(
+            command_result=command_result,
+            producer=producer,
+        )
+        return
+
+    raise ValueError(
+        f"Topic non supportato: {topic}"
+    )
 
 
 def handle_shutdown(
@@ -275,7 +420,12 @@ def run_agent() -> None:
     consumer = create_consumer()
     producer = create_producer()
 
-    consumer.subscribe([TELEMETRY_TOPIC])
+    consumer.subscribe(
+        [
+            TELEMETRY_TOPIC,
+            COMMAND_RESULTS_TOPIC,
+        ]
+    )
 
     print(
         f"Maintenance Agent avviato: {AGENT_ID}",
@@ -286,7 +436,11 @@ def run_agent() -> None:
         flush=True,
     )
     print(
-        f"Topic osservato: {TELEMETRY_TOPIC}",
+        f"Topic telemetria: {TELEMETRY_TOPIC}",
+        flush=True,
+    )
+    print(
+        f"Topic feedback: {COMMAND_RESULTS_TOPIC}",
         flush=True,
     )
 
@@ -309,14 +463,13 @@ def run_agent() -> None:
                 )
 
             try:
-                telemetry = deserialize_telemetry(
-                    message.value()
-                )
-
-                process_telemetry(
-                    telemetry=telemetry,
+                process_message(
+                    topic=message.topic(),
+                    message_value=message.value(),
                     producer=producer,
                 )
+
+                producer.flush(10)
 
                 consumer.commit(
                     message=message,
@@ -330,8 +483,15 @@ def run_agent() -> None:
                 ValueError,
             ) as error:
                 print(
-                    f"Evento non valido: {error}",
+                    f"Evento non valido "
+                    f"topic={message.topic()}: "
+                    f"{error}",
                     flush=True,
+                )
+
+                consumer.commit(
+                    message=message,
+                    asynchronous=False,
                 )
 
     finally:
