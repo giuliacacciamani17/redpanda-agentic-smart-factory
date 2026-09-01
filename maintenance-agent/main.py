@@ -242,7 +242,9 @@ def should_publish_command(
     action: str,
     previous_action: str,
 ) -> bool:
-    requires_intervention = action not in {
+    del previous_action
+
+    return action not in {
         NO_ACTION,
         MONITOR,
     }

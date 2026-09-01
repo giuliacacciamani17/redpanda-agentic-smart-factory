@@ -106,6 +106,7 @@ services:
       COMMAND_RESULTS_TOPIC: factory.command-results
       CONSUMER_GROUP: machine-controller-group
       CONTROLLER_ID: machine-controller-01
+      CONTROLLER_MODE: MIXED
     networks:
       - factory-network
     restart: unless-stopped

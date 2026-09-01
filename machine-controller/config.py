@@ -25,3 +25,8 @@ CONTROLLER_ID = os.getenv(
     "CONTROLLER_ID",
     "machine-controller-01",
 )
+
+CONTROLLER_MODE = os.getenv(
+    "CONTROLLER_MODE",
+    "MIXED",
+).upper()

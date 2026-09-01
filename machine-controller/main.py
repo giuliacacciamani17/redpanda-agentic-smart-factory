@@ -1,14 +1,22 @@
 import json
+import signal
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
-from confluent_kafka import Consumer, KafkaError, Producer
+from confluent_kafka import (
+    Consumer,
+    KafkaError,
+    KafkaException,
+    Producer,
+)
 
 from config import (
     COMMAND_RESULTS_TOPIC,
     COMMANDS_TOPIC,
     CONSUMER_GROUP,
     CONTROLLER_ID,
+    CONTROLLER_MODE,
     KAFKA_BROKER,
 )
 from controller import MachineController
@@ -16,10 +24,14 @@ from controller import MachineController
 
 REQUIRED_COMMAND_FIELDS = {
     "command_id",
+    "decision_id",
     "correlation_id",
     "machine_id",
     "action",
+    "risk_score",
 }
+
+running = True
 
 
 def create_consumer() -> Consumer:
@@ -42,21 +54,59 @@ def create_producer() -> Producer:
     return Producer(configuration)
 
 
-def validate_command(command: dict) -> None:
-    missing_fields = REQUIRED_COMMAND_FIELDS - command.keys()
+def deserialize_command(
+    message_value: bytes,
+) -> dict[str, Any]:
+    command = json.loads(
+        message_value.decode("utf-8")
+    )
+
+    if not isinstance(command, dict):
+        raise TypeError(
+            "Il comando deve essere un oggetto JSON"
+        )
+
+    missing_fields = (
+        REQUIRED_COMMAND_FIELDS
+        - command.keys()
+    )
 
     if missing_fields:
-        missing_fields_text = ", ".join(
+        missing_names = ", ".join(
             sorted(missing_fields)
         )
 
         raise ValueError(
-            "Comando non valido. "
-            f"Campi mancanti: {missing_fields_text}"
+            f"Campi mancanti: {missing_names}"
         )
 
+    return command
 
-def handle_delivery(error, message) -> None:
+
+def create_command_result(
+    command: dict[str, Any],
+    execution_result: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "result_id": str(uuid.uuid4()),
+        "command_id": command["command_id"],
+        "decision_id": command["decision_id"],
+        "correlation_id": command["correlation_id"],
+        "controller_id": CONTROLLER_ID,
+        "agent_id": command.get("agent_id"),
+        "machine_id": command["machine_id"],
+        "timestamp": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "action": command["action"],
+        **execution_result,
+    }
+
+
+def delivery_report(
+    error,
+    message,
+) -> None:
     if error is not None:
         print(
             f"Errore durante la pubblicazione: {error}",
@@ -73,68 +123,46 @@ def handle_delivery(error, message) -> None:
     )
 
 
-def create_command_result(
-    command: dict,
-    execution_result: dict,
-) -> dict:
-    return {
-        "result_id": str(uuid.uuid4()),
-        "command_id": command["command_id"],
-        "decision_id": command.get("decision_id"),
-        "correlation_id": command["correlation_id"],
-        "controller_id": CONTROLLER_ID,
-        "agent_id": command.get("agent_id"),
-        "machine_id": command["machine_id"],
-        "timestamp": datetime.now(
-            timezone.utc
-        ).isoformat(),
-        "action": command["action"],
-        **execution_result,
-    }
-
-
 def publish_result(
     producer: Producer,
-    command_result: dict,
+    command_result: dict[str, Any],
 ) -> None:
     producer.produce(
         topic=COMMAND_RESULTS_TOPIC,
-        key=command_result["machine_id"].encode("utf-8"),
+        key=command_result["machine_id"].encode(
+            "utf-8"
+        ),
         value=json.dumps(
             command_result
         ).encode("utf-8"),
-        callback=handle_delivery,
+        callback=delivery_report,
     )
 
     producer.poll(0)
 
 
-def process_message(
-    message,
+def process_command(
+    message_value: bytes,
     producer: Producer,
     controller: MachineController,
 ) -> None:
-    command = json.loads(
-        message.value().decode("utf-8")
-    )
-
-    validate_command(command)
+    command = deserialize_command(message_value)
 
     execution_result = controller.execute_command(
         command
     )
 
     command_result = create_command_result(
-        command,
-        execution_result,
+        command=command,
+        execution_result=execution_result,
     )
 
     publish_result(
-        producer,
-        command_result,
+        producer=producer,
+        command_result=command_result,
     )
 
-    producer.flush()
+    producer.flush(10)
 
     print(
         f"Macchina={command['machine_id']} "
@@ -146,10 +174,28 @@ def process_message(
     )
 
 
+def handle_shutdown(
+    signum,
+    frame,
+) -> None:
+    del signum, frame
+
+    global running
+    running = False
+
+    print(
+        "Arresto del Machine Controller richiesto",
+        flush=True,
+    )
+
+
 def run_controller() -> None:
     consumer = create_consumer()
     producer = create_producer()
-    controller = MachineController()
+
+    controller = MachineController(
+        mode=CONTROLLER_MODE
+    )
 
     consumer.subscribe([COMMANDS_TOPIC])
 
@@ -169,10 +215,16 @@ def run_controller() -> None:
         f"Topic risultati: {COMMAND_RESULTS_TOPIC}",
         flush=True,
     )
+    print(
+        f"Modalità Controller: {CONTROLLER_MODE}",
+        flush=True,
+    )
 
     try:
-        while True:
-            message = consumer.poll(1.0)
+        while running:
+            message = consumer.poll(
+                timeout=1.0
+            )
 
             if message is None:
                 continue
@@ -184,17 +236,15 @@ def run_controller() -> None:
                 ):
                     continue
 
-                print(
-                    f"Errore consumer: {message.error()}",
-                    flush=True,
+                raise KafkaException(
+                    message.error()
                 )
-                continue
 
             try:
-                process_message(
-                    message,
-                    producer,
-                    controller,
+                process_command(
+                    message_value=message.value(),
+                    producer=producer,
+                    controller=controller,
                 )
 
                 consumer.commit(
@@ -209,25 +259,39 @@ def run_controller() -> None:
                 ValueError,
             ) as error:
                 print(
-                    f"Comando non elaborabile: {error}",
+                    "Comando non elaborabile: "
+                    f"{error}",
                     flush=True,
                 )
 
-    except KeyboardInterrupt:
-        print(
-            "Arresto del Machine Controller richiesto",
-            flush=True,
-        )
+                consumer.commit(
+                    message=message,
+                    asynchronous=False,
+                )
 
     finally:
-        producer.flush()
+        producer.flush(10)
         consumer.close()
 
         print(
-            "Machine Controller arrestato correttamente",
+            "Machine Controller arrestato "
+            "correttamente",
             flush=True,
         )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    signal.signal(
+        signal.SIGINT,
+        handle_shutdown,
+    )
+    signal.signal(
+        signal.SIGTERM,
+        handle_shutdown,
+    )
+
     run_controller()
+
+
+if __name__ == "__main__":
+    main()
