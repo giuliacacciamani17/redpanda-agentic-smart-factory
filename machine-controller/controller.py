@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-
-
 REDUCE_SPEED = "REDUCE_SPEED"
 REQUEST_INSPECTION = "REQUEST_INSPECTION"
 EMERGENCY_STOP = "EMERGENCY_STOP"
@@ -12,13 +9,6 @@ MIXED = "MIXED"
 ALWAYS_SUCCESS = "ALWAYS_SUCCESS"
 
 
-@dataclass
-class MachineRuntimeState:
-    speed: int = 1400
-    status: str = "RUNNING"
-    inspection_requested: bool = False
-
-
 class MachineController:
     def __init__(
         self,
@@ -26,27 +16,20 @@ class MachineController:
     ) -> None:
         self.mode = mode
 
-        self.machine_states: dict[
-            str,
-            MachineRuntimeState,
-        ] = {}
-
         self.action_counters: dict[str, int] = {
             REDUCE_SPEED: 0,
             REQUEST_INSPECTION: 0,
             EMERGENCY_STOP: 0,
         }
 
-    def execute_command(self, command: dict) -> dict:
-        machine_id = command["machine_id"]
+    def execute_command(
+        self,
+        command: dict,
+    ) -> dict:
         action = command["action"]
 
-        machine_state = self._get_machine_state(
-            machine_id
-        )
-
-        execution_number = self._next_execution_number(
-            action
+        execution_number = (
+            self._next_execution_number(action)
         )
 
         if self._should_fail(
@@ -56,43 +39,42 @@ class MachineController:
             return self._create_failed_result(
                 action=action,
                 execution_number=execution_number,
-                machine_state=machine_state,
             )
 
         if action == REDUCE_SPEED:
-            return self._reduce_speed(
-                machine_state=machine_state,
+            return self._create_success_result(
+                action=action,
                 execution_number=execution_number,
+                message=(
+                    "Speed reduction command "
+                    "executed successfully"
+                ),
             )
 
         if action == REQUEST_INSPECTION:
-            return self._request_inspection(
-                machine_state=machine_state,
+            return self._create_success_result(
+                action=action,
                 execution_number=execution_number,
+                message=(
+                    "Maintenance inspection request "
+                    "executed successfully"
+                ),
             )
 
         if action == EMERGENCY_STOP:
-            return self._emergency_stop(
-                machine_state=machine_state,
+            return self._create_success_result(
+                action=action,
                 execution_number=execution_number,
+                message=(
+                    "Emergency stop command "
+                    "executed successfully"
+                ),
             )
 
         return self._create_unsupported_result(
             action=action,
             execution_number=execution_number,
-            machine_state=machine_state,
         )
-
-    def _get_machine_state(
-        self,
-        machine_id: str,
-    ) -> MachineRuntimeState:
-        if machine_id not in self.machine_states:
-            self.machine_states[
-                machine_id
-            ] = MachineRuntimeState()
-
-        return self.machine_states[machine_id]
 
     def _next_execution_number(
         self,
@@ -104,7 +86,10 @@ class MachineController:
         )
 
         execution_number = current_value + 1
-        self.action_counters[action] = execution_number
+
+        self.action_counters[action] = (
+            execution_number
+        )
 
         return execution_number
 
@@ -125,83 +110,31 @@ class MachineController:
             EMERGENCY_STOP: {1},
         }
 
-        return execution_number in failure_sequences.get(
+        failed_executions = failure_sequences.get(
             action,
             set(),
         )
 
-    @staticmethod
-    def _reduce_speed(
-        machine_state: MachineRuntimeState,
-        execution_number: int,
-    ) -> dict:
-        previous_speed = machine_state.speed
-
-        machine_state.speed = 900
-        machine_state.status = "REDUCED_SPEED"
-
-        return {
-            "result": SUCCESS,
-            "message": "Machine speed reduced",
-            "failure_reason": None,
-            "execution_number": execution_number,
-            "machine_status": machine_state.status,
-            "previous_speed": previous_speed,
-            "current_speed": machine_state.speed,
-            "inspection_requested": (
-                machine_state.inspection_requested
-            ),
-        }
+        return execution_number in failed_executions
 
     @staticmethod
-    def _request_inspection(
-        machine_state: MachineRuntimeState,
+    def _create_success_result(
+        action: str,
         execution_number: int,
+        message: str,
     ) -> dict:
-        machine_state.inspection_requested = True
-        machine_state.status = "INSPECTION_REQUIRED"
-
         return {
             "result": SUCCESS,
-            "message": (
-                "Maintenance inspection requested"
-            ),
+            "message": message,
             "failure_reason": None,
             "execution_number": execution_number,
-            "machine_status": machine_state.status,
-            "previous_speed": machine_state.speed,
-            "current_speed": machine_state.speed,
-            "inspection_requested": True,
-        }
-
-    @staticmethod
-    def _emergency_stop(
-        machine_state: MachineRuntimeState,
-        execution_number: int,
-    ) -> dict:
-        previous_speed = machine_state.speed
-
-        machine_state.speed = 0
-        machine_state.status = "STOPPED"
-
-        return {
-            "result": SUCCESS,
-            "message": "Emergency stop completed",
-            "failure_reason": None,
-            "execution_number": execution_number,
-            "machine_status": machine_state.status,
-            "previous_speed": previous_speed,
-            "current_speed": machine_state.speed,
-            "inspection_requested": (
-                machine_state.inspection_requested
-            ),
+            "executed_action": action,
         }
 
     @staticmethod
     def _create_failed_result(
         action: str,
         execution_number: int,
-        machine_state: MachineRuntimeState,
     ) -> dict:
         return {
             "result": FAILED,
@@ -209,32 +142,24 @@ class MachineController:
                 f"Command execution failed: {action}"
             ),
             "failure_reason": (
-                "Simulated actuator communication failure"
+                "Simulated actuator communication "
+                "failure"
             ),
             "execution_number": execution_number,
-            "machine_status": machine_state.status,
-            "previous_speed": machine_state.speed,
-            "current_speed": machine_state.speed,
-            "inspection_requested": (
-                machine_state.inspection_requested
-            ),
+            "executed_action": action,
         }
 
     @staticmethod
     def _create_unsupported_result(
         action: str,
         execution_number: int,
-        machine_state: MachineRuntimeState,
     ) -> dict:
         return {
             "result": FAILED,
-            "message": f"Unsupported action: {action}",
+            "message": (
+                f"Unsupported action: {action}"
+            ),
             "failure_reason": "Unsupported command",
             "execution_number": execution_number,
-            "machine_status": machine_state.status,
-            "previous_speed": machine_state.speed,
-            "current_speed": machine_state.speed,
-            "inspection_requested": (
-                machine_state.inspection_requested
-            ),
+            "executed_action": action,
         }

@@ -91,7 +91,9 @@ def create_command_result(
         "result_id": str(uuid.uuid4()),
         "command_id": command["command_id"],
         "decision_id": command["decision_id"],
-        "correlation_id": command["correlation_id"],
+        "correlation_id": command[
+            "correlation_id"
+        ],
         "controller_id": CONTROLLER_ID,
         "agent_id": command.get("agent_id"),
         "machine_id": command["machine_id"],
@@ -99,6 +101,7 @@ def create_command_result(
             timezone.utc
         ).isoformat(),
         "action": command["action"],
+        "risk_score": command["risk_score"],
         **execution_result,
     }
 
@@ -109,7 +112,8 @@ def delivery_report(
 ) -> None:
     if error is not None:
         print(
-            f"Errore durante la pubblicazione: {error}",
+            "Errore durante la pubblicazione: "
+            f"{error}",
             flush=True,
         )
         return
@@ -129,9 +133,9 @@ def publish_result(
 ) -> None:
     producer.produce(
         topic=COMMAND_RESULTS_TOPIC,
-        key=command_result["machine_id"].encode(
-            "utf-8"
-        ),
+        key=command_result[
+            "machine_id"
+        ].encode("utf-8"),
         value=json.dumps(
             command_result
         ).encode("utf-8"),
@@ -167,9 +171,12 @@ def process_command(
     print(
         f"Macchina={command['machine_id']} "
         f"azione={command['action']} "
-        f"risultato={execution_result['result']} "
-        f"stato={execution_result['machine_status']} "
-        f"correlation_id={command['correlation_id']}",
+        f"esecuzione="
+        f"{execution_result['execution_number']} "
+        f"risultato="
+        f"{execution_result['result']} "
+        f"correlation_id="
+        f"{command['correlation_id']}",
         flush=True,
     )
 
@@ -200,7 +207,8 @@ def run_controller() -> None:
     consumer.subscribe([COMMANDS_TOPIC])
 
     print(
-        f"Machine Controller avviato: {CONTROLLER_ID}",
+        "Machine Controller avviato: "
+        f"{CONTROLLER_ID}",
         flush=True,
     )
     print(
@@ -212,7 +220,8 @@ def run_controller() -> None:
         flush=True,
     )
     print(
-        f"Topic risultati: {COMMAND_RESULTS_TOPIC}",
+        "Topic risultati: "
+        f"{COMMAND_RESULTS_TOPIC}",
         flush=True,
     )
     print(

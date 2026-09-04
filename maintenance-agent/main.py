@@ -314,6 +314,8 @@ def create_feedback_event(
     command_result: dict[str, Any],
     state: MachineState,
 ) -> dict[str, Any]:
+    del state
+
     return {
         "feedback_id": str(uuid4()),
         "agent_id": AGENT_ID,
@@ -329,7 +331,6 @@ def create_feedback_event(
         ).isoformat(),
         "action": command_result["action"],
         "command_result": command_result["result"],
-        "machine_status": state.machine_status,
         "feedback_status": "PROCESSED",
         "message": (
             "The agent received the command result "
@@ -365,8 +366,7 @@ def process_command_result(
         f"{command_result['correlation_id']} "
         f"macchina={machine_id} "
         f"azione={command_result['action']} "
-        f"risultato={command_result['result']} "
-        f"stato={state.machine_status}",
+        f"risultato={command_result['result']} ",
         flush=True,
     )
 
