@@ -3,30 +3,30 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# Python virtual e*vironments
+# Python virtual environments
 .venv/
 venv/
 
-# Environ*ent variables and secrets
+# Environment variables and secrets
 .env
-*.e*v
+*.env
 
 # Test and coverage output
-.pyt*st_cache/
+.pytest_cache/
 .coverage
 htmlcov/
 
-# ID* configuration
+# IDE configuration
 .vscode/
 .idea/
 
-# *perating system files
+# Operating system files
 .DS_Store
-Th*mbs.db
+Thumbs.db
 
 # Logs
 *.log
 
-# Temporary *iles
+# Temporary files
 *.tmp
 *.swp
