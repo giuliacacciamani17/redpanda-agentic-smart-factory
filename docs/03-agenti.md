@@ -1,15 +1,7 @@
-# Agenti software nella Smart Factory
+# Agenti software
 
-## Obiettivi del capitolo
 
-Questo capitolo descrive:
 
-- che cos'è un agente software;
-- quali componenti rendono un sistema agentico;
-- la differenza tra agente, semplice consumer e controller;
-- come il `Maintenance Agent` del progetto percepisce, memorizza, valuta, decide, agisce e acquisisce feedback;
-- come gli identificativi permettono di ricostruire una decisione lungo tutti i topic Redpanda;
-- quali sono i limiti del prototipo e i possibili sviluppi futuri.
 
 > **Idea chiave:** un agente non si limita a trasferire dati. Osserva un ambiente, mantiene uno stato, applica una politica decisionale, produce azioni e usa il risultato delle azioni come feedback.
 
@@ -19,7 +11,7 @@ Questo capitolo descrive:
 
 Un **agente software** è un sistema che riceve informazioni da un ambiente, le interpreta rispetto a un obiettivo e sceglie un'azione. Un agente può funzionare con regole deterministiche, modelli statistici, tecniche di machine learning oppure modelli linguistici. Un LLM non è quindi un requisito obbligatorio.
 
-Le architetture agentiche possono includere percezione, elaborazione, decisione, azione, memoria e feedback. La memoria permette di conservare il contesto e di non trattare ogni input come un evento completamente isolato. [IBM, Components of AI Agents](https://www.ibm.com/think/topics/components-of-ai-agents) e [Microsoft, Memory for AI Agents](https://microsoft.github.io/ai-agents-for-beginners/13-agent-memory/) descrivono questi elementi come componenti centrali dei sistemi agentici.
+Le architetture agentiche possono includere percezione, elaborazione, decisione, azione, memoria e feedback. La memoria permette di conservare il contesto e di non trattare ogni input come un evento completamente isolato, risultano quindi elementi centrali dei sistemi agentici.
 
 ### 1.1 Modello generale
 
@@ -34,8 +26,9 @@ flowchart LR
     F --> M
 ```
 
+<!--
 GitHub visualizza i diagrammi Mermaid direttamente nei file Markdown, quindi il diagramma rimane modificabile insieme al codice sorgente. [GitHub Docs, Creating diagrams](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
-
+-->
 ---
 
 ## 2. Componenti fondamentali di un agente
@@ -52,7 +45,19 @@ GitHub visualizza i diagrammi Mermaid direttamente nei file Markdown, quindi il 
 
 ### 2.1 Percezione
 
-La percezione è il punto di ingresso dell'agente. Nel progetto, il `Machine Simulator` pubblica misurazioni strutturate:
+E` il momento in cui l’agente acquisisce informazioni sull’ambiente prima di aggiornare la memoria, calcolare il rischio e prendere una decisione. 
+
+Nel progetto, il `Machine Simulator` pubblica misurazioni strutturate come:
+
+- temperatura;
+- vibrazione;
+- velocità;
+- consumo energetico;
+- fase operativa.
+
+Questi dati vengono inseriti in un messaggio JSON e pubblicati sul topic `factory.telemetry`.
+
+Nel progetto un evento di telemetria ha questa struttura:
 
 ```json
 {
@@ -67,22 +72,39 @@ La percezione è il punto di ingresso dell'agente. Nel progetto, il `Machine Sim
 }
 ```
 
-Il `Maintenance Agent` si iscrive al topic di telemetria:
+Il `Maintenance Agent` si iscrive al topic di telemetria e riceve ogni nuovo messaggio.
+
+Per l’agente, quindi, ogni messaggio di telemetria rappresenta una nuova osservazione dello stato della macchina:
 
 ```python
 consumer.subscribe(
     [
         TELEMETRY_TOPIC,
-        COMMAND_RESULTS_TOPIC,
     ]
 )
 ```
 
 L'agente non legge soltanto sensori fisici. In un sistema event-driven, un topic può costituire l'interfaccia percettiva dell'agente.
 
+Il flusso è:
+
+```mermaid
+flowchart TD
+    A["Machine Simulator"]
+    B["factory.telemetry"]
+    C["Redpanda conserva e rende<br/>disponibile l'evento"]
+    D["Maintenance Agent"]
+    E["Aggiorna la memoria e<br/>interpreta la misurazione"]
+
+    A -->|"Genera una misurazione"| B
+    B --> C
+    C -->|"Distribuisce l'evento"| D
+    D --> E
+```
+
 ### 2.2 Memoria e stato interno
 
-Un consumer privo di memoria potrebbe reagire soltanto al valore corrente. Il progetto conserva invece una finestra delle ultime misurazioni:
+Viene conservata una finestra delle ultime misurazioni:
 
 ```python
 @dataclass
@@ -101,7 +123,7 @@ self.temperatures = deque(maxlen=self.window_size)
 self.vibrations = deque(maxlen=self.window_size)
 ```
 
-Questa è una forma di **memoria a breve termine**. Consente di calcolare medie e trend recenti senza conservare indefinitamente tutti gli eventi. La memoria agentica serve proprio a mantenere contesto, ricordare azioni precedenti e utilizzare risultati passati nelle valutazioni successive. [IBM, What is AI agent memory?](https://www.ibm.com/think/topics/ai-agent-memory)
+Questa è una forma di **memoria a breve termine**. Consente di calcolare medie e trend recenti senza conservare indefinitamente tutti gli eventi. La memoria agentica serve proprio a **mantenere contesto**, ricordare **azioni precedenti** e utilizzare **risultati passati** nelle valutazioni successive.
 
 ### 2.3 Valutazione del rischio
 
@@ -120,12 +142,74 @@ return round(min(total_risk, 1.0), 2)
 Nel prototipo i pesi sono:
 
 ```text
-Temperatura: 45%
-Vibrazione:  45%
-Trend:       10%
+TEMPERATURE_WEIGHT = 0.45
+VIBRATION_WEIGHT = 0.45
+TREND_WEIGHT = 0.10
 ```
 
-Il punteggio non rappresenta una probabilità scientificamente calibrata di guasto. È un indice deterministico, progettato per rendere osservabile il processo decisionale.
+Questo significa che il 45% del rischio deriva dalla temperatura, 
+45% del rischio deriva dalla vibrazione e infine il 10% del rischio deriva dal trend. Il trend indica semplicemente l’andamento recente dei valori nel tempo, verificando se i valori stanno aumentando progressimente nelle ultime misurazioni.
+
+Mentre per quanto riguarda le componenti `temperature_risk`, `vibration_risk` e `trend_risk` vengono calcolate come segue:
+
+
+```python
+    temperature_risk = normalize(
+        state.average_temperature(),
+        NORMAL_TEMPERATURE,
+        CRITICAL_TEMPERATURE,
+    )
+```
+
+Il sistema con la funziona `normalize` recupera la temperatura media e la confronta con due soglie `NORMAL_TEMPERATURE = 65.0` e `CRITICAL_TEMPERATURE = 90.0` ed il comportamento è:
+```text
+Temperatura media minore o uguale a 65 °C
+→ temperature_risk = 0.0
+
+Temperatura media maggiore o uguale a 90 °C
+→ temperature_risk = 1.0
+
+Temperatura media compresa tra 65 °C e 90 °C
+→ temperature_risk è un valore proporzionale tra 0.0 e 1.0
+```
+
+La seconda componente viene calcolata con:
+```python   
+    vibration_risk = normalize(
+        state.average_vibration(),
+        NORMAL_VIBRATION,
+        CRITICAL_VIBRATION,
+    )
+```
+Il sistema recupera la vibrazione media e la confronta con due soglie `NORMAL_VIBRATION= 2.0` e `CRITICAL_VIBRATION = 7.0` ed il comportamento è:
+```text
+Vibrazione media minore o uguale a 2.0
+→ vibration_risk = 0.0
+
+Vibrazione media maggiore o uguale a 7.0
+→ vibration_risk = 1.0
+
+Vibrazione media compresa tra 2.0 e 7.0
+→ vibration_risk è un valore proporzionale tra 0.0 e 1.0
+```
+
+Le funzioni non usano direttamente soltanto l'ultima misurazione ricevuta, ma utilizzano le medie calcolate sulla finestra di memoria:
+
+```python
+state.average_temperature()
+state.average_vibration()
+```
+
+Infine la terza componente viene calcolate con:
+```python
+    trend_risk = calculate_trend_risk(state)
+```
+Non considera soltanto quanto siano elevati i valori, ma controlla se temperatura e vibrazione stanno aumentando progressivamente nel tempo, considerando le ultime misurazioni. Se non sono ancora presenti tali valori, il sistema non dispone di informazioni sufficienti per stabilire un andamento.
+
+
+
+
+Il punteggio di rischio finale non rappresenta una probabilità scientificamente calibrata di guasto, ma è un indice deterministico, progettato per rendere osservabile il processo decisionale.
 
 ### 2.4 Politica decisionale
 
@@ -160,74 +244,9 @@ Separare il calcolo del rischio dalla politica rende il sistema più leggibile e
 
 ---
 
-## 3. Perché il Maintenance Agent è un agente
 
-Il `Maintenance Agent` non è un semplice inoltro di messaggi perché:
 
-1. percepisce telemetria da un ambiente esterno;
-2. conserva misurazioni precedenti;
-3. calcola uno stato sintetico di rischio;
-4. sceglie tra più azioni possibili;
-5. spiega la decisione;
-6. evita comandi operativi duplicati;
-7. riceve l'esito delle azioni;
-8. aggiorna lo stato interno dopo il feedback.
-
-```mermaid
-stateDiagram-v2
-    [*] --> NO_ACTION
-    NO_ACTION --> MONITOR: rischio >= 0.20
-    MONITOR --> REDUCE_SPEED: rischio >= 0.45
-    REDUCE_SPEED --> REQUEST_INSPECTION: rischio >= 0.65
-    REQUEST_INSPECTION --> EMERGENCY_STOP: rischio >= 0.85
-    EMERGENCY_STOP --> REQUEST_INSPECTION: rischio diminuisce
-    REQUEST_INSPECTION --> REDUCE_SPEED: recupero
-    REDUCE_SPEED --> MONITOR: recupero
-    MONITOR --> NO_ACTION: condizioni normali
-```
-
-### 3.1 Deduplicazione dei comandi
-
-L'agente registra ogni decisione nell'audit, ma non invia ripetutamente lo stesso comando:
-
-```python
-def should_publish_command(
-    action: str,
-    previous_action: str,
-) -> bool:
-    requires_intervention = action not in {
-        NO_ACTION,
-        MONITOR,
-    }
-
-    action_has_changed = action != previous_action
-
-    return requires_intervention and action_has_changed
-```
-
-La distinzione è:
-
-- `factory.agent-decisions` conserva ogni valutazione;
-- `factory.commands` contiene soltanto nuove azioni operative.
-
-### 3.2 `previous_action` e `selected_action`
-
-```json
-{
-  "previous_action": "MONITOR",
-  "selected_action": "REDUCE_SPEED",
-  "risk_score": 0.56
-}
-```
-
-- `previous_action` è l'azione memorizzata prima dell'evento corrente;
-- `selected_action` è la nuova decisione prodotta dopo l'aggiornamento dello stato.
-
-Il campo da osservare per sapere che cosa ha deciso l'agente **adesso** è `selected_action`. Il confronto tra i due campi descrive la transizione decisionale.
-
----
-
-## 4. Decisione, comando, risultato e feedback
+## 3. Decisione, comando, risultato e feedback
 
 Questi concetti sono distinti.
 
@@ -263,7 +282,7 @@ sequenceDiagram
     end
 ```
 
-### 4.1 Feedback positivo
+### 3.1 Feedback positivo
 
 ```json
 {
@@ -275,7 +294,7 @@ sequenceDiagram
 }
 ```
 
-### 4.2 Feedback negativo
+### 3.2 Feedback negativo
 
 ```json
 {
@@ -296,7 +315,69 @@ Senza feedback, l'agente conoscerebbe soltanto l'intenzione di agire. Con il fee
 
 ---
 
-## 5. Tracciabilità end-to-end
+## Perché il Maintenance Agent è un agente
+
+Il `Maintenance Agent` non è un semplice inoltro di messaggi perché:
+
+1. percepisce telemetria da un ambiente esterno;
+2. conserva misurazioni precedenti;
+3. calcola uno stato sintetico di rischio;
+4. sceglie tra più azioni possibili;
+5. spiega la decisione;
+6. evita comandi operativi duplicati;
+7. riceve l'esito delle azioni;
+8. aggiorna lo stato interno dopo il feedback.
+
+```mermaid
+stateDiagram-v2
+    [*] --> NO_ACTION
+    NO_ACTION --> MONITOR: rischio >= 0.20
+    MONITOR --> REDUCE_SPEED: rischio >= 0.45
+    REDUCE_SPEED --> REQUEST_INSPECTION: rischio >= 0.65
+    REQUEST_INSPECTION --> EMERGENCY_STOP: rischio >= 0.85
+    EMERGENCY_STOP --> REQUEST_INSPECTION: rischio diminuisce
+    REQUEST_INSPECTION --> REDUCE_SPEED: recupero
+    REDUCE_SPEED --> MONITOR: recupero
+    MONITOR --> NO_ACTION: condizioni normali
+```
+
+### Deduplicazione dei comandi
+
+L'agente registra ogni decisione nell'audit, ma non invia ripetutamente lo stesso comando:
+
+```python
+def should_publish_command(
+    action: str,
+    previous_action: str,
+) -> bool:
+    requires_intervention = action not in {
+        NO_ACTION,
+        MONITOR,
+    }
+
+    action_has_changed = action != previous_action
+
+    return requires_intervention and action_has_changed
+```
+
+La distinzione è nei topic:
+
+- `factory.agent-decisions` conserva ogni valutazione, ho una valutazione per ogni messaggio generato nel topic `factory.telemetry`;
+- `factory.commands` contiene soltanto nuove azioni operative che il controller dovrà leggere per effettuare modifiche nella macchina.
+
+In ogni messaggio del topic `factory.agent-decisions` sono presenti i campi `previous_action` che rappresenta l'azione memorizzata prima dell'evento corrente e `selected_action` che è la nuova decisione prodotta dopo l'aggiornamento dello stato.
+
+```json
+{
+  "previous_action": "MONITOR",
+  "selected_action": "REDUCE_SPEED",
+  "risk_score": 0.56
+}
+```
+
+Il campo da osservare per sapere che cosa ha deciso l'agente **adesso** è `selected_action`. Il confronto tra i due campi descrive la transizione decisionale.
+
+## Tracciabilità end-to-end
 
 Il progetto utilizza più identificativi con responsabilità diverse.
 
@@ -310,21 +391,8 @@ Il progetto utilizza più identificativi con responsabilità diverse.
 | `correlation_id` | Collega l'intera catena |
 | `sequence_number` | Ordina gli eventi nella singola simulazione |
 
-```mermaid
-flowchart LR
-    T[Telemetry<br/>event_id] -->|correlation_id| D[Decision<br/>decision_id]
-    D -->|correlation_id| C[Command<br/>command_id]
-    C -->|correlation_id| R[Result<br/>result_id]
-    R -->|correlation_id| F[Feedback<br/>feedback_id]
-```
 
-Esempio di ricerca:
-
-```text
-correlation_id = abc-130
-```
-
-La stessa correlazione permette di trovare:
+Si può fare una ricerca sulla base del `correlation_id` in modo tale da riuscire a capire il ciclo completo che un determinato evento fra tra i vari topic.
 
 ```text
 factory.telemetry
@@ -344,8 +412,8 @@ factory.agent-feedback
 ```
 
 ---
-
-## 6. Differenza tra i componenti del progetto
+<!--
+## Le componenti del progetto
 
 ### Machine Simulator
 
@@ -378,32 +446,9 @@ factory.agent-feedback
 - consente ai componenti di funzionare in modo asincrono;
 - mantiene offset e consumer group;
 - rende osservabile e ricostruibile il flusso.
-
+!-->
 ---
 
-## 7. Il ruolo dell'autonomia
-
-L'autonomia del prototipo è limitata ma concreta. Dopo l'avvio, il sistema non richiede una decisione umana per ogni telemetria. Il comportamento deriva da:
-
-```text
-stato recente + rischio + policy
-```
-
-L'agente può quindi selezionare autonomamente una delle cinque azioni disponibili. L'autonomia è però vincolata da regole definite dallo sviluppatore, che rendono il comportamento prevedibile e verificabile.
-
-Questa scelta è adatta a una Smart Factory didattica perché privilegia:
-
-- trasparenza;
-- determinismo;
-- auditabilità;
-- facilità di test;
-- sicurezza delle azioni.
-
-L'architettura segue inoltre il principio di utilizzare il livello minimo di complessità capace di soddisfare il requisito, evitando di introdurre un modello AI quando regole esplicite sono sufficienti e più controllabili. [Microsoft, AI Agent Orchestration Patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
-
----
-
-## 8. Reattività e proattività
 
 Il `Maintenance Agent` è principalmente **reattivo**:
 
@@ -421,69 +466,6 @@ Possiede però una componente più evoluta rispetto a una semplice regola istant
 - trend crescenti;
 - ultima azione;
 - feedback del controller.
-
-Non è ancora pienamente proattivo: non formula piani a lungo termine e non programma autonomamente interventi futuri.
-
----
-
-## 9. Limiti del prototipo
-
-1. **Stato volatile:** la memoria in `MachineState` viene persa quando il container viene ricreato.
-2. **Soglie didattiche:** pesi e soglie non derivano da dati industriali reali.
-3. **Un solo macchinario:** la struttura supporta più `machine_id`, ma la demo usa `machine-01`.
-4. **Controller simulato:** nessun attuatore fisico viene comandato.
-5. **Fallimenti controllati:** la modalità `MIXED` produce guasti artificiali per testare i feedback negativi.
-6. **Nessun piano di escalation:** un comando fallito viene registrato, ma non genera ancora automaticamente un nuovo piano.
-7. **Nessun apprendimento online:** la policy non modifica autonomamente le proprie soglie.
-
----
-
-## 10. Sviluppi futuri
-
-- persistere lo stato dell'agente;
-- gestire più macchine e più agenti;
-- introdurre retry ed escalation dopo un fallimento;
-- pubblicare eventi non validi in un dead-letter topic;
-- aggiungere test automatici per rischio, policy e stato;
-- usare dati storici per calibrare le soglie;
-- introdurre previsioni di manutenzione;
-- aggiungere un human-in-the-loop per le azioni critiche;
-- confrontare una policy deterministica con un modello ML;
-- misurare latenza end-to-end, throughput e recovery time.
-
----
-
-## 11. Sintesi
-
-Il progetto implementa un agente deterministico event-driven:
-
-```text
-Percezione
-factory.telemetry
-
-Memoria
-MachineState
-
-Valutazione
-risk_engine.py
-
-Decisione
-policy.py e factory.agent-decisions
-
-Azione
-factory.commands
-
-Esecuzione
-Machine Controller
-
-Risultato
-factory.command-results
-
-Feedback
-factory.agent-feedback
-```
-
-Il valore principale dell'architettura non consiste soltanto nel calcolo del rischio. Consiste nella capacità di collegare percezione, decisione, azione e feedback tramite eventi persistenti, identificatori e componenti indipendenti.
 
 ---
 

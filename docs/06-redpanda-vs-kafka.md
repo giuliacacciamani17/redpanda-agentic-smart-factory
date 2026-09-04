@@ -1,4 +1,4 @@
-# Redpanda e Apache Kafka: confronto applicato alla Smart Factory
+# Redpanda e Apache Kafka a confronto
 
 ## 1. Introduzione
 
