@@ -1,32 +1,43 @@
 # Redpanda e Apache Kafka a confronto
 
-Redpanda e Apache Kafka sono piattaforme di **event streaming distribuito**.
+Redpanda e Apache Kafka sono piattaforme di **event streaming distribuito** in grado di gestire flussi di eventi in tempo reale e svolgere il ruolo di infrastruttura per la comunicazione asincrona tra applicazioni, microservizi e sistemi distribuiti.
 
-Entrambe permettono di:
-
-- ricevere eventi dai producer;
-- organizzare gli eventi in topic;
-- suddividere i topic in partizioni;
-- conservare gli eventi;
-- distribuire gli eventi ai consumer;
-- organizzare i consumer in consumer group;
-- registrare l'avanzamento attraverso gli offset.
-
-Redpanda è compatibile con molte API e molti client Kafka, ma non è una distribuzione di Apache Kafka. Redpanda e Kafka sono due prodotti distinti, con implementazioni e strumenti operativi differenti.
+> **Idea chiave:**: Redpanda nasce infatti con l'obiettivo di offrire un'esperienza **compatibile con Kafka**, semplificando al contempo la gestione dell'infrastruttura e migliorando le prestazioni.
 
 ---
+
+## Cosa hanno in comune
+
+Sia Kafka che Redpanda sono progettati per:
+
+- gestire flussi continui di eventi
+- supportare architetture event-driven;
+- consentire la comunicazione asincrona tra servizi;
+- garantire elevata disponibilità e tolleranza ai guasti;
+- scalare orizzontalmente tramite cluster;
+- supportare pattern publish/subscribe;
+- memorizzare gli eventi all'interno di topic.
+
+In entrambi i casi il principio di funzionamento è il medesimo:
+
+```mermaid
+flowchart LR
+    A[Producer] --> P[Broker]
+    P --> H[Consumer]
+```
 
 ## Differenze principali
 
 | Aspetto | Redpanda | Apache Kafka |
 |---|---|---|
-| Tipologia | Piattaforma di event streaming compatibile con molte API Kafka | Piattaforma open source di event streaming distribuito |
+| Tipologia | Risulta più semplice da installare, configurare e mantenere| Il funzionamento richiedeva componenti aggiuntivi per la gestione del cluster |
+|Prestazioni| Ottime anche con infrastrutture relativamente contenute, permette di ridurre la latenza e massimizzare il throughput | Estremamente elevate, è stato progettato per gestire carichi molto importanti con miliardi di eventi ogni giorno|
 | Implementazione | Broker implementato con un motore nativo in C++ | Broker eseguito sulla JVM |
 | Gestione dei metadati | Utilizza una propria architettura basata su Raft | Nelle versioni moderne utilizza KRaft |
 | Strumento da terminale | Utilizza principalmente `rpk` | Utilizza gli strumenti e gli script della distribuzione Kafka |
 | Interfaccia grafica | Può essere utilizzato con Redpanda Console | Non include una singola interfaccia grafica predefinita nel progetto Apache |
 | Compatibilità Kafka | Supporta molte API e molti client Kafka, con alcune eccezioni | Rappresenta l'implementazione originale del protocollo Kafka |
-| Configurazione nel progetto | Eseguito tramite un servizio Docker dedicato | Richiederebbe una diversa configurazione Docker e KRaft |
+| Complessità di gestione | Punta sulla semplicità operativa, ridotto il numero di compomenti da amministrare | Estremamente potente ma richiede una maggiore conoscenza dell'infrastruttura |
 
 
 ---
@@ -68,15 +79,6 @@ Redpanda invece utilizza una propria architettura basata su **Raft**.
 Raft è un algoritmo di consenso che permette a più nodi di concordare sullo stesso stato anche in presenza di alcuni guasti. Un nodo opera come leader, mentre gli altri replicano le informazioni come follower. Una modifica viene considerata confermata quando viene accettata dalla maggioranza dei nodi del gruppo. Redpanda utilizza quindi Raft non soltanto per i **metadati**, ma anche per la **replica dei dati** applicativi contenuti nelle partizioni.
 
 
-La distinzione corretta è:
-
-```text
-Apache Kafka moderno
-→ utilizza KRaft.
-
-Redpanda
-→ utilizza una propria architettura basata su Raft.
-```
 
 ---
 
@@ -96,12 +98,6 @@ La Console permette di osservare:
 - decisioni dell'agente;
 - risultati `SUCCESS` e `FAILED`;
 - `correlation_id`.
-
-La Console è accessibile da:
-
-```text
-http://localhost:8080
-```
 
 **Apache Kafka non include una singola interfaccia** grafica predefinita nel progetto Apache. Per ottenere una visualizzazione simile è necessario scegliere e configurare uno strumento compatibile.
 
@@ -133,6 +129,29 @@ Redpanda e Kafka condividono il modello fondamentale dell'event streaming.
 **7. Offeset**: Redpanda e Kafka assegnano a ogni record un offset all'interno della partizione, rappresentando la posizione del record nella partizione.
 
 **8. Consumer Group**: entrambe le piattaforme supportano i consumer group che registrano l'avanzamento dell'applicazione e permetteno a più istanze dello stesso consumer di dividersi le partizioni.
+
+---
+# Quando utilizzare Kafka
+
+Kafka rappresenta spesso la scelta migliore quando:
+
+- l'organizzazione possiede già un ecosistema Kafka consolidato;
+- sono presenti cluster di grandi dimensioni;
+- è richiesta una piattaforma ampiamente collaudata;
+- si opera in contesti enterprise molto complessi;
+- sono necessari strumenti altamente specializzati dell'ecosistema Kafka.
+
+---
+# Quando utilizzare Redpanda
+
+Redpanda rappresenta una scelta molto interessante quando:
+
+- si desidera ridurre la complessità operativa;
+- si vuole una soluzione più semplice da gestire;
+- si sta sviluppando una nuova architettura cloud-native;
+- si necessita di elevate prestazioni con infrastruttura ridotta;
+- si realizzano sistemi basati su eventi, AI Agent o architetture agentiche;
+- si desidera una compatibilità con Kafka senza adottarne tutta la complessità.
 
 ---
 
@@ -195,14 +214,13 @@ confluent-kafka
 Non è stato quindi necessario utilizzare una libreria specifica e proprietaria per produrre o consumare eventi.
 
 
-
-### 2. Disponibilità di Redpanda Console
+### 3. Disponibilità di Redpanda Console
 
 Redpanda Console permette di vedere graficamente i messaggi presenti nei topic.
 
 Questa funzione è particolarmente utile in un progetto accademico perché permette di seguire facilmente il percorso di ogni evento.
 
-### 3. Osservazione del ciclo agentico
+### 4. Osservazione del ciclo agentico
 
 Attraverso Redpanda Console è possibile seguire lo stesso `correlation_id` nei diversi topic:
 
@@ -227,15 +245,14 @@ Questo rende più semplice dimostrare il funzionamento del Maintenance Agent.
 I principali vantaggi osservati nel progetto sono:
 
 1. avvio locale semplice tramite Docker Compose;
-2. compatibilità con il client Python `confluent-kafka`;
-3. gestione dei topic tramite `rpk`;
-4. interfaccia grafica tramite Redpanda Console;
-5. visualizzazione immediata dei messaggi JSON;
-6. controllo di partizioni e offset;
-7. osservazione dei consumer group e del lag;
-8. persistenza degli eventi;
-9. tracciabilità tramite `correlation_id`;
-10. supporto alla comunicazione asincrona tra i servizi.
+2. compatibilità con il client Python `confluent-kafka`;;
+3. interfaccia grafica tramite Redpanda Console;
+4. visualizzazione immediata dei messaggi JSON;
+5. controllo di partizioni e offset;
+6. osservazione dei consumer group e del lag;
+7. persistenza degli eventi;
+8. tracciabilità tramite `correlation_id`;
+9. supporto alla comunicazione asincrona tra i servizi.
 
 
 ---
@@ -243,20 +260,6 @@ I principali vantaggi osservati nel progetto sono:
 ## Che cosa cambierebbe usando Kafka
 
 La logica principale del progetto potrebbe rimanere quasi invariata.
-
-Potrebbero restare uguali:
-
-- Machine Simulator;
-- Maintenance Agent;
-- Risk Engine;
-- policy decisionale;
-- Machine Controller;
-- eventi JSON;
-- nomi dei topic;
-- `machine_id`;
-- `correlation_id`;
-- consumer group;
-- gestione degli offset.
 
 Cambierebbero principalmente gli aspetti infrastrutturali:
 
@@ -274,6 +277,21 @@ Il broker configurato nei servizi potrebbe diventare:
 ```yaml
 KAFKA_BROKER: kafka:9092
 ```
+
+Potrebbero restare uguali:
+
+- Machine Simulator;
+- Maintenance Agent;
+- Risk Engine;
+- policy decisionale;
+- Machine Controller;
+- eventi JSON;
+- nomi dei topic;
+- `machine_id`;
+- `correlation_id`;
+- consumer group;
+- gestione degli offset.
+
 
 Il client Python potrebbe continuare a essere:
 
