@@ -1,19 +1,22 @@
 # Agenti software
 
 
-
-
-> **Idea chiave:** un agente non si limita a trasferire dati. Osserva un ambiente, mantiene uno stato, applica una politica decisionale, produce azioni e usa il risultato delle azioni come feedback.
+> **Idea chiave:** un agente non si limita a trasferire dati. Osserva un ambiente, mantiene uno stato, applica una politica decisionale, produce azioni e usa il risultato delle azioni come feedback per l'adattamento.
 
 ---
 
-## 1. Che cos'è un agente
+## Che cos'è un agente
 
-Un **agente software** è un sistema che riceve informazioni da un ambiente, le interpreta rispetto a un obiettivo e sceglie un'azione. Un agente può funzionare con regole deterministiche, modelli statistici, tecniche di machine learning oppure modelli linguistici. Un LLM non è quindi un requisito obbligatorio.
+Un **agente software** è un sistema che:
+1. riceve informazioni da un ambiente;
+2. le interpreta rispetto a un obiettivo;
+3. sceglie un'azione. 
 
-Le architetture agentiche possono includere percezione, elaborazione, decisione, azione, memoria e feedback. La memoria permette di conservare il contesto e di non trattare ogni input come un evento completamente isolato, risultano quindi elementi centrali dei sistemi agentici.
+`Agente = Percezione + Elaborazione + Azione`
 
-### 1.1 Modello generale
+Un agente può funzionare con regole deterministiche, modelli statistici, tecniche di machine learning oppure modelli linguistici. Un LLM non è quindi un requisito obbligatorio, ma rappresenta lo stato dell'arte per la maggior parte degli agenti moderni.
+
+Le architetture agentiche possono includere **percezione**, **elaborazione**, **decisione**, **azione**, **memoria** e **feedback**. La memoria permette di conservare il **contesto** e di non trattare ogni input come un evento completamente isolato, risultano quindi elementi centrali dei sistemi agentici.
 
 ```mermaid
 flowchart LR
@@ -31,7 +34,225 @@ GitHub visualizza i diagrammi Mermaid direttamente nei file Markdown, quindi il 
 -->
 ---
 
-## 2. Componenti fondamentali di un agente
+## Tipologie di agenti
+
+Gli agenti possono essere classificati in base al modo in cui **prendono decisioni** e **gestiscono l'interazione con l'ambiente**.
+
+**1. Agenti reattivi** 
+
+Rappresentano la forma più semplice di agente. Non mantengono una rappresentazione complessa dello stato del mondo e rispondono direttamente agli stimoli ricevuti.
+
+Schema logico:
+
+```text
+SE condizione X
+ALLORA azione Y
+```
+
+Esempi:
+
+- termostati;
+- sistemi antifurto;
+- automazioni basate su regole.
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| Semplicità di implementazione<br>Elevata velocità di esecuzione| Scarsa capacità di adattamento<br>Assenza di pianificazione a lungo termine 
+
+
+
+---
+
+**2. Agenti orientati agli obiettivi**
+
+Prendono decisioni in funzione di un obiettivo da raggiungere.
+
+Non si limitano a reagire agli eventi ma valutano quali azioni consentiranno di raggiungere il risultato desiderato.
+
+```text
+Stato attuale
+      ↓
+  Obiettivo
+      ↓
+ Pianificazione
+      ↓
+    Azione
+```
+
+Esempi:
+
+- navigatori GPS;
+- sistemi di pianificazione automatica;
+- assistenti digitali che eseguono attività complesse.
+
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| Maggiore flessibilità | Dipendenza dal modello dell'ambiente |
+| Efficienza operativa | Richiedono modelli e algoritmi<br>più sofisticati rispetto agli agenti reattivi|
+
+---
+
+**3. Agenti che apprendono**
+
+Migliorano il proprio comportamento attraverso l'esperienza.
+
+Possono utilizzare:
+
+- Machine Learning;
+- Deep Learning;
+- Reinforcement Learning.
+
+Durante l'esecuzione raccolgono feedback e aggiornano il proprio modello decisionale.
+
+Esempi:
+
+- sistemi di raccomandazione;
+- robot autonomi;
+- sistemi di previsione.
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| Riduzione dell'intervento umano | Addestramento costoso
+| Le prestazioni aumentano grazie<br>all'esperienza accumulata. | Richiedono dataset sufficienti e di<br>qualità per apprendere correttamente.|
+
+---
+
+**4. Agenti basati su Large Language Model (LLM)**
+
+Gli agenti moderni sono spesso costruiti utilizzando un **Large Language Model (LLM)** come componente di ragionamento.
+
+In questo caso il modello linguistico non rappresenta l'intero agente, ma una delle sue componenti.
+
+Un agente basato su LLM integra generalmente:
+
+- ragionamento tramite modello linguistico;
+- memoria contestuale;
+- strumenti esterni (*tools*);
+- pianificazione delle attività;
+- meccanismi di feedback.
+
+Esempi:
+
+- assistenti virtuali;
+- copiloti per lo sviluppo software;
+- sistemi di automazione documentale.
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| Comprensione del linguaggio naturale| necessità di aggiornare continuamente il modello interno | Modelli avanzati possono richiedere infrastrutture e risorse significative
+| Possono utilizzare API, database, motori di ricerca e applicazioni esterne | La qualità dei risultati dipende spesso dalla formulazione delle istruzioni|
+
+---
+
+## Architetture di implementazione
+
+La struttura interna di un agente può variare in funzione della complessità del problema da risolvere.
+
+**1. Architettura Single Agent**
+
+Nell'architettura **Single Agent** un unico agente gestisce l'intero processo decisionale.
+
+```mermaid
+flowchart LR
+    U[Utente] --> A[Agente]
+    A --> T[Strumenti]
+```
+
+L'agente si occupa di:
+
+- interpretare la richiesta;
+- pianificare le attività;
+- utilizzare gli strumenti disponibili;
+- produrre il risultato finale.
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| semplicità architetturale | limitata scalabilità
+ minori costi di sviluppo | minor specializzazione delle competenze
+
+---
+
+
+
+**2. Architettura Multi-Agent**
+
+In un sistema **Multi-Agent** più agenti specializzati collaborano per raggiungere un obiettivo comune.
+
+```mermaid
+flowchart TD
+    C[Coordinatore]
+    C --> A1[Agente Ricerca]
+    C --> A2[Agente Analisi]
+    C --> A3[Agente Produzione Output]
+```
+
+Ogni agente svolge una funzione specifica.
+
+Esempio:
+
+- un agente raccoglie informazioni;
+- un agente esegue l'analisi;
+- un agente genera il risultato finale.
+
+| **Vantaggi** | **Svantaggi** |
+|------------|-----------|
+| specializzazione delle attività | coordinamento più complesso
+  maggiore modularità | gestione della comunicazione tra agenti
+
+
+
+---
+
+**3.Human-in-the-Loop**
+
+In alcune applicazioni l'essere umano rimane parte integrante del processo decisionale.
+
+```mermaid
+flowchart LR
+    A[Agente] --> P[Proposta]
+    P --> H[Operatore]
+    H --> E[Esecuzione]
+```
+
+L'agente propone un'azione ma l'esecuzione richiede una validazione umana.
+
+Questa architettura è comune in:
+
+- sanità;
+- finanza;
+- ambiti regolamentati;
+- processi aziendali critici.
+
+---
+
+## Differenza tra agente e programma tradizionale
+
+Un programma tradizionale esegue una **sequenza di istruzioni** definite dallo sviluppatore.
+
+```text
+Input → Elaborazione → Output
+```
+
+Le regole operative sono generalmente statiche e il comportamento è completamente determinato dalla logica implementata.
+
+Un agente introduce invece ulteriori capacità:
+
+- osservazione dell'ambiente;
+- mantenimento dello stato;
+- valutazione del contesto;
+- selezione autonoma delle azioni;
+- utilizzo del feedback;
+- eventuale apprendimento.
+
+
+
+>La principale differenza consiste quindi nel livello di autonomia: mentre un programma tradizionale esegue istruzioni predefinite, un **agente sceglie dinamicamente il comportamento** più appropriato in funzione dello stato dell'ambiente e degli obiettivi assegnati.
+
+
+---
+
+## Componenti fondamentali di un agente
 
 | Componente | Domanda | Implementazione nel progetto |
 |---|---|---|
@@ -43,7 +264,7 @@ GitHub visualizza i diagrammi Mermaid direttamente nei file Markdown, quindi il 
 | Feedback | L'azione è stata eseguita? | Consumo di `factory.command-results` |
 | Audit | Come ricostruisco il processo? | `factory.agent-decisions`, `factory.agent-feedback` e `correlation_id` |
 
-### 2.1 Percezione
+### Percezione
 
 E` il momento in cui l’agente acquisisce informazioni sull’ambiente prima di aggiornare la memoria, calcolare il rischio e prendere una decisione. 
 
@@ -102,7 +323,7 @@ flowchart TD
     D --> E
 ```
 
-### 2.2 Memoria e stato interno
+### Memoria e stato interno
 
 Viene conservata una finestra delle ultime misurazioni:
 
@@ -125,7 +346,7 @@ self.vibrations = deque(maxlen=self.window_size)
 
 Questa è una forma di **memoria a breve termine**. Consente di calcolare medie e trend recenti senza conservare indefinitamente tutti gli eventi. La memoria agentica serve proprio a **mantenere contesto**, ricordare **azioni precedenti** e utilizzare **risultati passati** nelle valutazioni successive.
 
-### 2.3 Valutazione del rischio
+### Valutazione del rischio
 
 Il file `risk_engine.py` trasforma lo stato della macchina in un punteggio compreso tra `0.0` e `1.0`:
 
@@ -211,7 +432,7 @@ Non considera soltanto quanto siano elevati i valori, ma controlla se temperatur
 
 Il punteggio di rischio finale non rappresenta una probabilità scientificamente calibrata di guasto, ma è un indice deterministico, progettato per rendere osservabile il processo decisionale.
 
-### 2.4 Politica decisionale
+### Politica decisionale
 
 Il file `policy.py` converte il rischio in un'azione:
 
@@ -246,7 +467,7 @@ Separare il calcolo del rischio dalla politica rende il sistema più leggibile e
 
 
 
-## 3. Decisione, comando, risultato e feedback
+## Decisione, comando, risultato e feedback
 
 Questi concetti sono distinti.
 
@@ -282,7 +503,7 @@ sequenceDiagram
     end
 ```
 
-### 3.1 Feedback positivo
+### Feedback positivo
 
 ```json
 {
@@ -294,7 +515,7 @@ sequenceDiagram
 }
 ```
 
-### 3.2 Feedback negativo
+### Feedback negativo
 
 ```json
 {
@@ -341,112 +562,7 @@ stateDiagram-v2
     MONITOR --> NO_ACTION: condizioni normali
 ```
 
-### Deduplicazione dei comandi
 
-L'agente registra ogni decisione nell'audit, ma non invia ripetutamente lo stesso comando:
-
-```python
-def should_publish_command(
-    action: str,
-    previous_action: str,
-) -> bool:
-    requires_intervention = action not in {
-        NO_ACTION,
-        MONITOR,
-    }
-
-    action_has_changed = action != previous_action
-
-    return requires_intervention and action_has_changed
-```
-
-La distinzione è nei topic:
-
-- `factory.agent-decisions` conserva ogni valutazione, ho una valutazione per ogni messaggio generato nel topic `factory.telemetry`;
-- `factory.commands` contiene soltanto nuove azioni operative che il controller dovrà leggere per effettuare modifiche nella macchina.
-
-In ogni messaggio del topic `factory.agent-decisions` sono presenti i campi `previous_action` che rappresenta l'azione memorizzata prima dell'evento corrente e `selected_action` che è la nuova decisione prodotta dopo l'aggiornamento dello stato.
-
-```json
-{
-  "previous_action": "MONITOR",
-  "selected_action": "REDUCE_SPEED",
-  "risk_score": 0.56
-}
-```
-
-Il campo da osservare per sapere che cosa ha deciso l'agente **adesso** è `selected_action`. Il confronto tra i due campi descrive la transizione decisionale.
-
-## Tracciabilità end-to-end
-
-Il progetto utilizza più identificativi con responsabilità diverse.
-
-| Campo | Responsabilità |
-|---|---|
-| `event_id` | Identifica la telemetria |
-| `decision_id` | Identifica la decisione |
-| `command_id` | Identifica il comando |
-| `result_id` | Identifica il risultato |
-| `feedback_id` | Identifica il feedback |
-| `correlation_id` | Collega l'intera catena |
-| `sequence_number` | Ordina gli eventi nella singola simulazione |
-
-
-Si può fare una ricerca sulla base del `correlation_id` in modo tale da riuscire a capire il ciclo completo che un determinato evento fra tra i vari topic.
-
-```text
-factory.telemetry
-→ misurazioni che hanno originato il caso
-
-factory.agent-decisions
-→ rischio e azione selezionata
-
-factory.commands
-→ comando inviato
-
-factory.command-results
-→ esito tecnico
-
-factory.agent-feedback
-→ esito acquisito dall'agente
-```
-
----
-<!--
-## Le componenti del progetto
-
-### Machine Simulator
-
-- rappresenta il macchinario;
-- produce temperatura, vibrazione, velocità e consumo;
-- non calcola il rischio;
-- non decide azioni.
-
-### Maintenance Agent
-
-- percepisce la telemetria;
-- conserva memoria recente;
-- calcola il rischio;
-- sceglie un'azione;
-- pubblica comandi;
-- acquisisce il feedback.
-
-### Machine Controller
-
-- non valuta la telemetria;
-- non decide quale azione sia migliore;
-- riceve un comando già scelto;
-- simula l'esecuzione;
-- pubblica `SUCCESS` oppure `FAILED`.
-
-### Redpanda
-
-- disaccoppia producer e consumer;
-- conserva gli eventi;
-- consente ai componenti di funzionare in modo asincrono;
-- mantiene offset e consumer group;
-- rende osservabile e ricostruibile il flusso.
-!-->
 ---
 
 

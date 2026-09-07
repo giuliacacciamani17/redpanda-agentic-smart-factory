@@ -1,30 +1,40 @@
-# Redpanda nella Smart Factory agentica
+# Redpanda
 
 ## Che cos'è Redpanda
 
-Redpanda è una piattaforma di **event streaming** compatibile con il protocollo Kafka.
+Redpanda è una piattaforma di **event streaming** compatibile con il protocollo Kafka, progettata per consentire la gestione e l'elaborazione di flussi di eventi in tempo reale.
 
-Una piattaforma di event streaming riceve eventi prodotti dalle applicazioni, li conserva in sequenza e li rende disponibili ad altre applicazioni che devono elaborarli.
+> **Idea chiave:** nel progetto, Redpanda è il **broker di event streaming** utilizzato come componente centrale per implementare il Data plane.
 
-Un evento rappresenta qualcosa che è accaduto nel sistema. Alcuni esempi sono:
+Una piattaforma di event streaming riceve eventi prodotti dalle applicazioni, i  `producer`, li conserva in sequenza e li rende disponibili ad altre applicazioni che devono elaborarli, i `consumer`. 
 
-- una nuova misurazione di temperatura;
-- una variazione del livello di vibrazione;
-- una decisione presa da un agente;
-- un comando inviato a un macchinario;
-- il risultato dell'esecuzione di un comando.
+```mermaid
+flowchart LR
+    A[Producer] --> P[Redpanda]
+    P --> H[Consumer]
+```
 
 Redpanda organizza gli eventi in **topic**, cioè flussi logici dedicati a categorie specifiche di dati.
 
-> **Idea chiave:** nel progetto, Redpanda è il broker di event streaming utilizzato come componente centrale per implementare il data plane.
 
-Redpanda non coincide con l'intero data plane. Il data plane comprende anche topic, partizioni, producer, consumer, consumer group, offset ed eventi, mentre Redpanda è il broker centrale che riceve, conserva e distribuisce questi eventi.
+Redpanda non coincide con l'intero Data Plane. Il Data Plane comprende anche topic, partizioni, producer, consumer, consumer group, offset ed eventi, mentre Redpanda è il broker centrale che riceve, conserva e distribuisce questi eventi.
 
 ---
 
 ## A che cosa serve Redpanda
 
-Redpanda permette a componenti indipendenti di comunicare senza chiamarsi direttamente.
+L'importanza di Redpanda deriva principalmente dall'evoluzione dei moderni sistemi software.
+Le applicazioni contemporanee richiedono infatti:
+
+- elaborazione in tempo reale;
+- elevata scalabilità;
+- comunicazione asincrona;
+- riduzione delle dipendenze tra servizi;
+- gestione di grandi volumi di dati.
+
+In scenari di questo tipo, una comunicazione diretta tra applicazioni può generare **elevato accoppiamento** e **ridurre la flessibilità dell'intera architettura**.
+
+Redpanda introduce invece un **meccanismo di comunicazione basato sugli eventi** che consente ai diversi componenti di collaborare senza conoscere direttamente l'implementazione degli altri servizi.
 
 Il modello generale è:
 
@@ -42,18 +52,19 @@ Consumer
 legge ed elabora l'evento
 ```
 
-Redpanda svolge quindi queste funzioni principali:
-
-1. riceve eventi dai producer;
-2. organizza gli eventi in topic;
-3. conserva i record in modo persistente;
-4. assegna ogni record a una partizione;
-5. assegna un offset all'interno della partizione;
-6. rende i record disponibili ai consumer;
-7. mantiene l'avanzamento dei consumer group;
-8. disaccoppia chi produce i dati da chi li elabora.
-
 Questa struttura favorisce una **comunicazione asincrona**. Il producer può pubblicare un evento senza attendere che il consumer completi immediatamente tutta l'elaborazione.
+
+---
+
+# Principali casi di utilizzo
+
+| Utilizzo | Descrizione |
+|-----------|-------------|
+| **Broker** | Riceve eventi dai sistemi che li generano e li distribuisce alle applicazioni interessate. |
+| **Event Streaming** | Gli eventi prodotti vengono conservati all'interno dei topic e possono essere elaborati in tempo reale da uno o più consumer. |
+| **Microservizi** | Consente la comunicazione asincrona tra servizi indipendenti all'interno di architetture basate su microservizi. |
+| **Data Pipeline** | Permette il trasferimento delle informazioni dalle sorgenti dati ai sistemi di elaborazione, ai Data Lake e ai database. |
+| **Sistemi AI e Agentic Architecture** | Supporta la comunicazione tra agenti intelligenti attraverso lo scambio di eventi. |
 
 ---
 
@@ -211,19 +222,15 @@ producer.produce(
 
 I parametri principali sono:
 
-```text
-1. Topic
-Indica dove deve essere salvato l'evento.
 
-2.Key
-Identifica la macchina e influenza la scelta della partizione.
+**1. Topic**: Indica dove deve essere salvato l'evento.
 
-3.Value
-Contiene il messaggio JSON.
+**2.Key**: Identifica la macchina e influenza la scelta della partizione.
 
-4. Callback
-Comunica se Redpanda ha accettato il record.
-```
+**3.Value**: Contiene il messaggio JSON.
+
+**4. Callback**: Comunica se Redpanda ha accettato il record.
+
 
 Il Maintenance Agent e il Machine Controller utilizzano lo stesso modello per pubblicare decisioni, comandi, risultati e feedback.
 
@@ -273,14 +280,13 @@ partizione 1
 partizione 2
 ```
 
-Le partizioni permettono di distribuire dati e lavoro e di garantire l'ordine all'interno della singola partizione. Al momento per scopo didattico del progetto viene utilizzata una sola partizione, ma sono disponibili nel momento in cui ci saranno più istanze per il consumer.
+Le partizioni permettono di distribuire dati e lavoro e di garantire l'ordine all'interno della singola partizione. Al momento per scopo didattico del progetto viene utilizzata una sola partizione, ma sono disponibili anche le altre nel momento in cui ci saranno più istanze per il consumer.
 
 Gli eventi usano `machine_id` come chiave:
 
 ```python
 key=event["machine_id"].encode("utf-8")
 ```
-
 
 
 ---
@@ -295,7 +301,7 @@ offset 1
 offset 2
 ```
 
-Il consumer group permette a un'applicazione consumer di registrare fino a quale offset è arrivata, in modo tale che due applicazioni possano legger ein contemporanea due topic senza interferire tra di loro.
+Il consumer group permette a un'applicazione consumer di registrare fino a quale offset è arrivata, in modo tale che due applicazioni possano leggere in contemporanea due topic senza interferire tra di loro.
 
 Nel progetto sono presenti:
 
@@ -382,31 +388,7 @@ command:
   - dev-container
 ```
 
-
-## Health check
-
-Redpanda include un controllo di salute:
-
-```yaml
-healthcheck:
-  test:
-    - CMD-SHELL
-    - rpk cluster health | grep -q 'Healthy:.*true'
-  interval: 10s
-  timeout: 5s
-  retries: 10
-```
-
-Gli altri servizi attendono che il broker sia disponibile:
-
-```yaml
-depends_on:
-  redpanda:
-    condition: service_healthy
-```
-
-Questo riduce il rischio che Maintenance Agent e Machine Controller provino a collegarsi prima dell'avvio completo del broker.
-
+<!--
 ---
 
 ## rpk e Redpanda Console
@@ -429,6 +411,7 @@ Esempio:
 ```bash
 docker exec redpanda rpk topic list
 ```
+-->
 
 ### Redpanda Console
 
@@ -438,14 +421,14 @@ Redpanda Console è l'interfaccia grafica accessibile da:
 http://localhost:8080
 ```
 
-È stata utilizzata per osservare:
+È fondamentale per osservare:
 
+- topic;
 - messaggi JSON;
 - partizioni e offset;
 - decisioni dell'agente;
 - risultati `SUCCESS` e `FAILED`;
-- feedback;
-- `correlation_id`.
+- feedback.
 
 ---
 

@@ -1,16 +1,18 @@
 # Agentic Data Plane nella Smart Factory
 
-## Che cos'è un data plane
+## Che cos'è un Data Plane
 
-Un **data plane** è l'insieme dei componenti e dei meccanismi che permettono ai dati operativi di attraversare un sistema durante la sua esecuzione.
+Un **Data Plane** è l'insieme dei componenti e dei meccanismi che permettono ai dati operativi di **attraversare un sistema durante la sua esecuzione**.
 
-In un sistema distribuito, il data plane gestisce il flusso concreto delle informazioni tra i diversi servizi. Non stabilisce necessariamente le regole del sistema, ma permette ai dati prodotti da un componente di raggiungere i componenti che devono elaborarli.
+Viene spesso chiamato anche **Forwarding Plane** perché si occupa di instradare e movimentare le informazioni da una sorgente a una destinazione.
+
+In un sistema distribuito, il Data Plane gestisce il **flusso concreto delle informazioni tra i diversi servizi**. Non stabilisce necessariamente le regole del sistema, ma permette ai dati di raggiungere tutti i componenti che devono elaborarli.
 
 Il suo funzionamento generale può essere rappresentato così:
 
 ```mermaid
-flowchart LR
-    A["Componente che produce un dato"]
+flowchart TD
+    A["Generazione del dato"]
     B["Canale di comunicazione"]
     C["Trasporto e conservazione del dato"]
     D["Componente che legge il dato"]
@@ -22,43 +24,30 @@ flowchart LR
     D --> E
 ```
 
-Nel progetto, i dati operativi comprendono:
-
-- telemetrie della macchina;
-- decisioni del Maintenance Agent;
-- comandi operativi;
-- risultati del Machine Controller;
-- feedback acquisiti dall'agente.
 
 ---
 
-## Differenza tra control plane e data plane
+## Differenza tra Control Plane e Data Plane
 
-Il **control plane** e il **data plane** svolgono funzioni differenti.
+Il **Control Plane** e il **Data Plane** svolgono funzioni differenti.
 
-Il control plane definisce configurazioni, regole e politiche. Per esempio, decide quali servizi devono esistere, quali topic devono essere disponibili e quali soglie definiscono un rischio critico.
+**Control Plane**: definisce configurazioni, regole e politiche. Per esempio, decide quali servizi devono esistere, quali topic devono essere disponibili e quali soglie definiscono un rischio critico.
 
-Il data plane trasporta invece i dati operativi prodotti durante l'esecuzione. Nel progetto, questi dati comprendono:
-
-- temperature e vibrazioni;
-- decisioni del Maintenance Agent;
-- comandi operativi;
-- risultati prodotti dal Machine Controller;
-- feedback finali acquisiti dall'agente.
+**Data Plane**: trasporta invece i dati operativi prodotti durante l'esecuzione.
 
 In forma sintetica:
 
 ```text
-Control plane
+Control Plane
 Definisce come il sistema deve funzionare.
 
-Data plane
+Data Plane
 Trasporta ciò che accade durante il funzionamento.
 ```
 
-Il file `compose.yaml` appartiene principalmente alla configurazione del sistema. Le comunicazioni che attraversano i topic Redpanda costituiscono invece il data plane operativo.
+Il file `compose.yaml` appartiene principalmente alla configurazione del sistema, mentre le comunicazioni che attraversano i topic Redpanda costituiscono invece il Data Plane operativo.
 
-Un esempio di configurazione è:
+Un esempio di configurazione può essere:
 
 ```yaml
 STATE_WINDOW_SIZE: "5"
@@ -67,115 +56,103 @@ CONTROLLER_MODE: MIXED
 
 Questi valori definiscono come devono comportarsi i componenti.
 
-Il data plane entra invece in funzione quando vengono prodotti e consumati eventi:
-
-```text
-telemetria
-        ↓
-decisione
-        ↓
-comando
-        ↓
-risultato
-        ↓
-feedback
-```
-
 La distinzione può essere riassunta così:
 
-> Le configurazioni stabiliscono come il sistema deve funzionare. Il data plane trasporta ciò che accade mentre il sistema è in funzione.
+> Le configurazioni del Control Plane stabiliscono come il sistema deve funzionare. Il Data Plane trasporta ciò che accade mentre il sistema è in funzione.
 
 ---
 
-## Che cos'è un agentic data plane
+## Ruoli principali del Data Plane
 
-Un **agentic data plane** è un data plane progettato per sostenere il ciclo operativo di uno o più agenti software.
-
-Un agente non ha bisogno soltanto di ricevere dati. Deve poter:
-
-1. percepire lo stato dell'ambiente;
-2. aggiornare la propria memoria;
-3. valutare la situazione;
-4. prendere una decisione;
-5. richiedere un'azione;
-6. osservare il risultato dell'azione;
-7. aggiornare nuovamente il proprio stato attraverso il feedback.
-
-L'agentic data plane deve quindi trasportare più categorie di eventi:
-
-```text
-Percezioni
-Decisioni
-Comandi
-Risultati
-Feedback
-```
-
-Nel progetto, queste categorie corrispondono ai cinque topic applicativi:
-
-```text
-factory.telemetry
-factory.agent-decisions
-factory.commands
-factory.command-results
-factory.agent-feedback
-```
+ 
+| Ruoli | Descrizione |
+|--------|-------------|
+| **Trasporto dei dati** | Permette lo spostamento delle informazioni tra sistemi, applicazioni e servizi. |
+| **Elaborazione dei pacchetti** | Analizza e instrada i dati in base alle regole ricevute dal Control Plane. |
+| **Applicazione delle politiche** | Può implementare controlli di sicurezza, Quality of Service (QoS) e filtri di accesso ai dati. |
+| **Ottimizzazione delle prestazioni** | È progettato per garantire velocità elevate, bassa latenza ed elevata affidabilità durante la trasmissione delle informazioni. |
 
 ---
 
-## Differenza tra data plane tradizionale e agentic data plane
+## Perché è utile utilizzare un Data Plane?
 
-Un data plane tradizionale può limitarsi a trasportare dati tra applicazioni.
+L'utilizzo di un Data Plane offre numerosi vantaggi.
 
-Esempio:
+- **Separazione delle responsabilità**: Suddivide le decisioni strategiche dalle operazioni esecutive rendendo l'architettura più organizzata e scalabile, infatti il Control Plane decide, mentre il Data Plane esegue.
 
-```text
-Sensore
-        ↓
-dato di temperatura
-        ↓
-sistema di archiviazione
-```
+- **Maggiore efficienza**: poiché è specializzato nella movimentazione dei dati, può essere ottimizzato per prestazioni molto elevate. 
 
-In questo caso, il dato viene trasferito e conservato, ma non è necessariamente parte di un ciclo decisionale.
+- **Scalabilità**: permette di gestire grandi volumi di traffico senza aumentare eccessivamente la complessità del sistema. 
 
-Un agentic data plane trasporta invece anche gli **eventi prodotti dal ragionamento e dalle azioni di un agente:
+- **Sicurezza**: consente di applicare regole e controlli sul traffico dati in modo centralizzato e coerente.
+---
+## Evoluzione del Data Plane
 
-```text
-Telemetria
-        ↓
-valutazione del rischio
-        ↓
-decisione
-        ↓
-comando
-        ↓
-risultato
-        ↓
-feedback
-```
+Il concetto di Data Plane nasce nel settore delle **reti di comunicazione** e delle infrastrutture Internet, dove si è consolidato con la diffusione di router, switch e protocolli di routing moderni. Con l'evoluzione del cloud computing e delle architetture Software Defined Networking (SDN), la **separazione tra Control Plane e Data Plane è diventata sempre più importante**.
 
-La differenza principale è quindi la seguente:
+Oggi il Data Plane continua a evolversi perché:
 
->**Data plane tradizionale**:Trasporta dati tra componenti.
+- i volumi di dati sono in costante crescita;
 
-> **Agentic data plane**:Trasporta dati, decisioni, azioni e risultati necessari a chiudere il ciclo operativo dell'agente.
+- le applicazioni distribuite richiedono tempi di risposta sempre più bassi;
 
+- i sistemi di Intelligenza Artificiale necessitano di accesso rapido e controllato ai dati;
 
-Il broker non rende automaticamente un sistema agentico. Il carattere agentico deriva dalla presenza di:
+- le organizzazioni devono garantire sicurezza e governance sempre più rigorose.
 
-- un agente con memoria;
-- una funzione di valutazione;
-- una politica decisionale;
-- azioni operative;
-- risultati osservabili;
-- un ciclo di feedback.
+Per questi motivi il Data Plane è ancora un'area attiva di ricerca e sviluppo.
 
 ---
 
-## Il data plane realizzato nel progetto
+## Che cos'è un Agentic Data Plane
 
-Nel progetto, il data plane è formato da:
+Un **Agentic Data Plane** è un'evoluzione del Data Plane progettato per sostenere il ciclo operativo di uno o più **agenti software**.
+
+L'idea fondamentale è che non basta più movimentare i dati: bisogna fornire agli agenti l'accesso sicuro, controllato e contestualizzato alle informazioni e alle azioni che possono eseguire.  
+
+In pratica, un Agentic Data Plane diventa l'infrastruttura che collega:
+
+- agenti AI;
+
+- modelli linguistici (LLM);
+
+- basi di dati;
+
+- applicazioni aziendali;
+
+- strumenti esterni;
+
+- sistemi di monitoraggio e governance.
+
+## Come funziona un Agentic Data Plane?
+
+Un Agentic Data Plane introduce funzionalità aggiuntive rispetto a un Data Plane tradizionale.
+
+| **Caratteristica** | **Descrizione** |
+|------------|-----------|
+| **Gestione dell'identità** | Ogni agente possiede una propria identità digitale e opera secondo permessi specifici. |
+| **Governance** | Ogni azione compiuta dall'agente viene monitorata, registrata e resa verificabile. |
+| **Accesso ai dati** | L'agente può interrogare database, documenti e sistemi aziendali in modo controllato. |
+| **Integrazione con strumenti** | Può utilizzare API, servizi cloud, workflow aziendali e altre applicazioni per completare i propri compiti. |
+| **Osservabilità** | Tutte le operazioni vengono registrate per facilitare audit, debugging e controllo dei costi. |
+
+
+---
+## Differenze tra Data Plane e Agentic Data Plane
+
+| Data Plane Tradizionale | Agentic Data Plane |
+|-------------------------|-------------------|
+| Trasporta ed elabora dati | Coordina dati, strumenti e agenti AI |
+| Lavora su flussi di rete | Lavora su flussi decisionali e operativi |
+| Segue istruzioni del Control Plane | Supporta agenti autonomi che prendono decisioni |
+| Focus sulle prestazioni | Focus su prestazioni, governance e autonomia |
+| Gestisce traffico dati | Gestisce dati, strumenti, permessi e azioni degli agenti |
+
+
+
+## L'Agentic Data Plane realizzato nel progetto
+
+Nel progetto, il Data Plane è formato da:
 
 - Redpanda come broker centrale;
 - i topic applicativi;
@@ -187,9 +164,9 @@ Nel progetto, il data plane è formato da:
 - i consumer group;
 - gli eventi JSON scambiati tra i servizi.
 
-Redpanda è quindi il **broker di event streaming che costituisce il cuore infrastrutturale del data plane**, ma non coincide da solo con l'intero data plane.
+Redpanda è quindi il **broker di event streaming che costituisce il cuore infrastrutturale del Data Plane**, ma non coincide da solo con l'intero Data Plane.
 
-Il data plane completo comprende anche i componenti che producono e consumano gli eventi.
+Il Data Plane completo comprende anche i componenti che producono e consumano gli eventi.
 
 ```mermaid
 flowchart TD
@@ -212,9 +189,21 @@ flowchart TD
     G --> H
     H --> I
 ```
-
 ---
 
+## Perchè inserire un Broker nel Data Plane
+
+Un Data Plane può funzionare perfettamente senza alcun message broker. Infatti è possibile utilizzare un `API Rest` oppure una `ETL Pipeline` che si frappone tra il producer e il consumer.
+
+Tuttavia, nelle moderne architetture distribuite e negli Agentic Data Plane, **broker** ed event streaming platform sono spesso utilizzati per facilitare:
+- la comunicazione asincrona;
+- la scalabilità;
+- il disaccoppiamento tra sistemi e agenti;
+- persistenza degli eventi.
+
+-----
+
+<!--
 ## Percezione dell'ambiente
 
 La prima funzione dell'agentic data plane è trasportare le informazioni che descrivono lo stato dell'ambiente.
@@ -428,24 +417,24 @@ Risultato
         ↓
 Feedback
 ```
-
+-->
 ---
-
 ## Comunicazione asincrona
 
-I componenti non si chiamano direttamente.
+L'Agentic Data Plane, posto alla base dell'architettura del progetto, ha il compito di disaccoppiare le diverse componenti del sistema, evitando comunicazioni dirette tra di esse.
 
-Il Machine Simulator non invia una richiesta HTTP al Maintenance Agent. Il Maintenance Agent non chiama direttamente il Machine Controller.
+Ad esempio, il **Machine Simulator**, che genera i dati telemetrici della macchina, non invia richieste HTTP direttamente al **Maintenance Agent**. Allo stesso modo, il **Maintenance Agent**, dopo aver analizzato i dati e aver preso una decisione, non comunica direttamente con il **Machine Controller** per impartire le azioni correttive.
 
-Ogni componente pubblica o consuma eventi attraverso il data plane.
+Tutte le interazioni avvengono attraverso l'Agentic Data Plane, che funge da livello intermedio di comunicazione e coordinamento.
+
 
 ```text
-Comunicazione diretta
+Comunicazione diretta:
 Simulator → Agent → Controller
 ```
 
 ```text
-Comunicazione asincrona
+Comunicazione asincrona:
 Simulator → topic → Agent → topic → Controller
 ```
 
@@ -457,11 +446,10 @@ Questo disaccoppiamento permette ai componenti di:
 - rileggere eventi ancora disponibili;
 - essere osservati tramite topic e log.
 
----
-
+<!--
 ## Persistenza e recupero
 
-Gli eventi non scompaiono subito dopo la lettura. Redpanda li conserva secondo la configurazione del broker e dei topic.
+Gli eventi non scompaiono subito dopo la lettura, perché Redpanda li conserva secondo la configurazione del broker e dei topic.
 
 Questa proprietà permette a un consumer temporaneamente arrestato di **recuperare gli eventi dopo il riavvio**.
 
@@ -586,10 +574,10 @@ Agentic Data Plane
 Redpanda non calcola il rischio. Il Maintenance Agent non conserva direttamente i messaggi per gli altri servizi. Il Machine Controller non decide autonomamente quale azione sia necessaria.
 
 Questa separazione rende l'architettura modulare e comprensibile.
-
+-->
 ---
 
-## Adattamento del data plane al comportamento agentico
+## Adattamento del Data Plane al comportamento agentico
 
 Nel progetto, un normale flusso di eventi è stato adattato alle necessità di un agente attraverso quattro scelte.
 
@@ -609,7 +597,7 @@ L'agente pubblica un comando, mentre il Machine Controller ne simula l'esecuzion
 
 Il risultato ritorna all'agente e viene registrato in `factory.agent-feedback`.
 
-Queste caratteristiche trasformano una semplice pipeline di telemetria in un agentic data plane.
+Queste caratteristiche trasformano una semplice pipeline di telemetria in un Agentic Data Plane.
 
 ---
 
