@@ -72,7 +72,7 @@ Se il progetto utilizzasse Kafka, sarebbe necessario sostituire il servizio Redp
 
 ## Differenza nella gestione dei metadati
 
-Le versioni moderne di Apache Kafka utilizzano **KRaft** per la gestione distribuita dei metadati del cluster. 
+Le versioni moderne di Apache Kafka, in sostituzione a Zookeeper, utilizzano **KRaft** per la gestione distribuita dei metadati del cluster. 
 In modalità KRaft, alcuni nodi Kafka assumono il ruolo di `controller` e partecipano a un quorum. I controller mantengono un **registro condiviso dei metadati** e devono raggiungere un consenso sulle modifiche alla configurazione del cluster.
 
 Redpanda invece utilizza una propria architettura basata su **Raft**. 

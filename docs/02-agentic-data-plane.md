@@ -201,227 +201,39 @@ Tuttavia, nelle moderne architetture distribuite e negli Agentic Data Plane, **b
 - il disaccoppiamento tra sistemi e agenti;
 - persistenza degli eventi.
 
------
-
-<!--
-## Percezione dell'ambiente
-
-La prima funzione dell'agentic data plane è trasportare le informazioni che descrivono lo stato dell'ambiente.
-
-Nel progetto, il `Machine Simulator` genera una telemetria simile a:
-
-```json
-{
-  "event_id": "uuid-evento",
-  "correlation_id": "abc-125",
-  "machine_id": "machine-01",
-  "temperature": 93.94,
-  "vibration": 6.82,
-  "speed": 1450,
-  "energy_consumption": 128.0,
-  "phase": "DEGRADING"
-}
-```
-
-L'evento viene pubblicato su:
+Broker si occupa di gestire lo scambio tra producer e consumer.
 
 ```text
-factory.telemetry
+Producer
+↓
+Redpanda
+↓
+Consumer
 ```
 
-Il `Maintenance Agent` è configurato per controllare e leggere i messaggi disponibili nel topic della telemetria (legge i messagi anche dal topic `factory.command_results` per produrre dei feedback).
-
-```python
-consumer.subscribe(
-    [
-        TELEMETRY_TOPIC,
-        COMMAND_RESULTS_TOPIC,
-    ]
-)
-```
-
-Per l'agente, ogni evento di telemetria rappresenta una nuova osservazione della macchina, per questa presenta tanti eventi quanto sono quelli riportati nel topic che salva la telemetria.
+Data Plane è invece un concetto architetturale più ampio, si occupa della movimentazione e della gestione operativa dei dati tra i componenti del sistema.
+Può essere composto da:
 
 ```text
-Machine Simulator
-        ↓
-genera una misurazione
-        ↓
-factory.telemetry
-        ↓
-Maintenance Agent
-        ↓
-aggiorna la memoria
+Data Plane
+├── Broker
+├── API
+├── Database
+├── Event Stream
+├── Pipeline
+├── Tool di monitoraggio
+└── Servizi di elaborazione
 ```
 
----
+> **Idea chiave**: 
+> Broker = Strumento 
+>
+> Data Plane = architettura
 
-## Decisione dell'agente
-
-Dopo aver ricevuto la telemetria, il Maintenance Agent:
-
-1. aggiorna la memoria della macchina;
-2. calcola le medie recenti;
-3. verifica il trend;
-4. calcola il `risk_score`;
-5. seleziona un'azione.
-
-Ogni valutazione viene pubblicata su:
-
-```text
-factory.agent-decisions
-```
-
-Un evento può contenere:
-
-```json
-{
-  "correlation_id": "abc-125",
-  "risk_score": 0.56,
-  "previous_action": "MONITOR",
-  "selected_action": "REDUCE_SPEED",
-  "reason": "The risk level requires a speed reduction"
-}
-```
-
-La decisione è parte del data plane perché viene prodotta durante l'esecuzione e resa disponibile come evento persistente.
-
----
-
-## Comandi operativi
-
-Non tutte le decisioni richiedono l'intervento del Controller.
-
-```text
-NO_ACTION
-→ nessun comando
-
-MONITOR
-→ nessun comando
-
-REDUCE_SPEED
-→ comando
-
-REQUEST_INSPECTION
-→ comando
-
-EMERGENCY_STOP
-→ comando
-```
-
-Le azioni operative vengono pubblicate su `factory.commands`, in modo tale che il `Machine Controller` può leggere gli eventi da questo topic e simula l'esecuzione delle azioni.
-
-La separazione tra decisione e comando permette di distinguere:
-
-```text
-factory.agent-decisions
-Che cosa ha deciso l'agente.
-
-factory.commands
-Che cosa deve essere realmente eseguito.
-```
-
----
-
-## Risultati delle azioni
-
-Dopo aver elaborato un comando, il Machine Controller pubblica il risultato su:
-
-```text
-factory.command-results
-```
-
-Un risultato positivo può essere:
-
-```json
-{
-  "correlation_id": "abc-125",
-  "action": "REDUCE_SPEED",
-  "result": "SUCCESS",
-  "machine_status": "REDUCED_SPEED",
-  "previous_speed": 1400,
-  "current_speed": 900
-}
-```
-
-Un risultato negativo può essere:
-
-```json
-{
-  "correlation_id": "abc-127",
-  "action": "EMERGENCY_STOP",
-  "result": "FAILED",
-  "failure_reason": "Simulated actuator communication failure",
-  "machine_status": "RUNNING"
-}
-```
-
-Il risultato permette di distinguere tra azione richiesta e azione realmente eseguita.
-
----
-
-## Ciclo di feedback
-
-Il ciclo agentico non termina quando il Maintenance Agent pubblica il comando, infatti l'agente deve sapere se l'azione richiesta ha avuto successo oppure è fallita.
-
-Per questo il Maintenance Agent legge anche:
-
-```text
-factory.command-results
-```
-
-Quando riceve il risultato, aggiorna il proprio stato interno:
-
-```python
-state.update_command_result(command_result)
-```
-
-Successivamente pubblica un feedback su:
-
-```text
-factory.agent-feedback
-```
-
-Un feedback può contenere:
-
-```json
-{
-  "correlation_id": "abc-127",
-  "action": "EMERGENCY_STOP",
-  "command_result": "FAILED",
-  "machine_status": "RUNNING",
-  "feedback_status": "PROCESSED"
-}
-```
-
-È importante distinguere i due campi:
-
-```text
-command_result = FAILED
-Il Controller non è riuscito a eseguire il comando.
-
-feedback_status = PROCESSED
-L'agente ha ricevuto e interpretato correttamente il risultato negativo.
-```
-
-Il feedback chiude il ciclo:
-
-```text
-Percezione
-        ↓
-Decisione
-        ↓
-Azione
-        ↓
-Risultato
-        ↓
-Feedback
-```
--->
 ---
 ## Comunicazione asincrona
 
-L'Agentic Data Plane, posto alla base dell'architettura del progetto, ha il compito di disaccoppiare le diverse componenti del sistema, evitando comunicazioni dirette tra di esse.
+L'Agentic Data Plane, posto alla base dell'architettura del progetto, ha il compito di **disaccoppiare le diverse componenti del sistema**, evitando comunicazioni dirette tra di esse.
 
 Ad esempio, il **Machine Simulator**, che genera i dati telemetrici della macchina, non invia richieste HTTP direttamente al **Maintenance Agent**. Allo stesso modo, il **Maintenance Agent**, dopo aver analizzato i dati e aver preso una decisione, non comunica direttamente con il **Machine Controller** per impartire le azioni correttive.
 
@@ -445,136 +257,6 @@ Questo disaccoppiamento permette ai componenti di:
 - essere sostituiti senza cambiare gli altri servizi;
 - rileggere eventi ancora disponibili;
 - essere osservati tramite topic e log.
-
-<!--
-## Persistenza e recupero
-
-Gli eventi non scompaiono subito dopo la lettura, perché Redpanda li conserva secondo la configurazione del broker e dei topic.
-
-Questa proprietà permette a un consumer temporaneamente arrestato di **recuperare gli eventi dopo il riavvio**.
-
-Esempio:
-
-```text
-Maintenance Agent arrestato
-        ↓
-il simulatore pubblica una telemetria
-        ↓
-Redpanda conserva l'evento
-        ↓
-il Maintenance Agent viene riavviato
-        ↓
-riprende dalla posizione registrata
-        ↓
-elabora la telemetria
-```
-
-Gli offset e i consumer group permettono di registrare l'avanzamento dei consumer.
-
-I dettagli tecnici relativi a partizioni, offset, consumer group e volume persistente sono descritti nel documento `05-redpanda.md`.
-
----
-
-## Tracciabilità end-to-end
-
-Gli offset identificano la posizione dei record all'interno delle singole partizioni, ma non collegano automaticamente record presenti in topic differenti.
-
-Il progetto usa quindi il campo:
-
-```text
-correlation_id
-```
-
-Lo stesso valore viene propagato lungo tutta la catena:
-
-```text
-factory.telemetry
-        ↓
-factory.agent-decisions
-        ↓
-factory.commands
-        ↓
-factory.command-results
-        ↓
-factory.agent-feedback
-```
-
-Per esempio, cercando:
-
-```text
-abc-125
-```
-
-è possibile ricostruire:
-
-1. quale telemetria è stata ricevuta;
-2. quale rischio è stato calcolato;
-3. quale decisione è stata presa;
-4. quale comando è stato inviato;
-5. quale risultato è stato prodotto;
-6. quale feedback è stato acquisito.
-
-Questa caratteristica rende il data plane auditabile e osservabile.
-
----
-
-## Relazione tra eventi e topic
-
-Il numero di record non deve essere uguale in tutti i topic.
-
-Un esempio è:
-
-```text
-5 telemetrie
-        ↓
-5 decisioni
-        ↓
-3 comandi
-        ↓
-3 risultati
-        ↓
-3 feedback
-```
-
-La differenza dipende dalla logica dell'agente:
-
-```text
-NO_ACTION e MONITOR
-Non richiedono l'intervento del Controller.
-
-REDUCE_SPEED, REQUEST_INSPECTION ed EMERGENCY_STOP
-Producono un comando e, successivamente, un risultato e un feedback.
-```
-
-Il data plane non copia semplicemente ogni messaggio in tutti i topic. Trasporta eventi derivati sulla base delle decisioni applicative.
-
----
-
-## Separazione delle responsabilità
-
-Ogni componente mantiene una responsabilità precisa.
-
-```text
-Machine Simulator
-Produce osservazioni dell'ambiente.
-
-Maintenance Agent
-Interpreta le osservazioni e prende decisioni.
-
-Machine Controller
-Esegue i comandi simulati.
-
-Redpanda
-Riceve, conserva e distribuisce gli eventi.
-
-Agentic Data Plane
-È l'insieme del flusso operativo che collega questi componenti.
-```
-
-Redpanda non calcola il rischio. Il Maintenance Agent non conserva direttamente i messaggi per gli altri servizi. Il Machine Controller non decide autonomamente quale azione sia necessaria.
-
-Questa separazione rende l'architettura modulare e comprensibile.
--->
 ---
 
 ## Adattamento del Data Plane al comportamento agentico
@@ -603,6 +285,6 @@ Queste caratteristiche trasformano una semplice pipeline di telemetria in un Age
 
 ## Riferimenti
 
-- Redpanda Documentation, Introduction to Redpanda: <https://docs.redpanda.com/streaming/current/get-started/intro-to-events/>
-- Redpanda Documentation, How Redpanda Works: <https://docs.redpanda.com/streaming/current/get-started/architecture/>
-- Redpanda Documentation, Consumer Offsets: <https://docs.redpanda.com/streaming/current/develop/consume-data/consumer-offsets/>
+- IBM, **Control Plane vs. Data Plane**: <https://www.ibm.com/think/topics/control-plane-vs-data-plane>
+- Redpanda, **Introducing the Agentic Data Plane**:<https://www.redpanda.com/blog/agentic-data-plane>
+- Redpanda **Agentic Data Plane**:<https://www.redpanda.com/agentic-data-plane>
