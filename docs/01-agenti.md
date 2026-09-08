@@ -14,7 +14,7 @@ Un **agente software** è un sistema che:
 
 `Agente = Percezione + Elaborazione + Azione`
 
-Un agente può funzionare con regole deterministiche, modelli statistici, tecniche di machine learning oppure modelli linguistici. Un LLM non è quindi un requisito obbligatorio, ma rappresenta lo stato dell'arte per la maggior parte degli agenti moderni.
+Un agente può funzionare con **regole deterministiche**, **modelli statistici**, **tecniche di machine learning** oppure **modelli linguistici**. Un LLM non è quindi un requisito obbligatorio, ma rappresenta lo stato dell'arte per la maggior parte degli agenti moderni.
 
 Le architetture agentiche possono includere **percezione**, **elaborazione**, **decisione**, **azione**, **memoria** e **feedback**. La memoria permette di conservare il **contesto** e di non trattare ogni input come un evento completamente isolato, risultano quindi elementi centrali dei sistemi agentici.
 
@@ -564,6 +564,7 @@ stateDiagram-v2
 
 
 ---
+
 
 
 Il `Maintenance Agent` è principalmente **reattivo**:
