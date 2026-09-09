@@ -412,8 +412,8 @@ Esempio:
 docker exec redpanda rpk topic list
 ```
 -->
-
-### Redpanda Console
+---
+## Redpanda Console
 
 Redpanda Console è l'interfaccia grafica accessibile da:
 

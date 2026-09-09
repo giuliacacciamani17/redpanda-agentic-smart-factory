@@ -57,7 +57,8 @@ Esempi:
 
 | **Vantaggi** | **Svantaggi** |
 |------------|-----------|
-| Semplicità di implementazione<br>Elevata velocità di esecuzione| Scarsa capacità di adattamento<br>Assenza di pianificazione a lungo termine 
+| Semplice da implementare| Scarsa capacità di adattamento| 
+|Elevata velocità di esecuzione| Assenza di pianificazione a lungo termine|
 
 
 
@@ -114,7 +115,7 @@ Esempi:
 | **Vantaggi** | **Svantaggi** |
 |------------|-----------|
 | Riduzione dell'intervento umano | Addestramento costoso
-| Le prestazioni aumentano grazie<br>all'esperienza accumulata. | Richiedono dataset sufficienti e di<br>qualità per apprendere correttamente.|
+| Le prestazioni aumentano grazie all'esperienza accumulata. | Richiedono dataset sufficienti e di<br>qualità per apprendere correttamente.|
 
 ---
 
@@ -140,7 +141,7 @@ Esempi:
 
 | **Vantaggi** | **Svantaggi** |
 |------------|-----------|
-| Comprensione del linguaggio naturale| necessità di aggiornare continuamente il modello interno | Modelli avanzati possono richiedere infrastrutture e risorse significative
+| Comprensione del linguaggio naturale| Necessità di aggiornare continuamente il modello interno | Modelli avanzati possono richiedere infrastrutture e risorse significative
 | Possono utilizzare API, database, motori di ricerca e applicazioni esterne | La qualità dei risultati dipende spesso dalla formulazione delle istruzioni|
 
 ---
@@ -247,7 +248,7 @@ Un agente introduce invece ulteriori capacità:
 
 
 
->La principale differenza consiste quindi nel livello di autonomia: mentre un programma tradizionale esegue istruzioni predefinite, un **agente sceglie dinamicamente il comportamento** più appropriato in funzione dello stato dell'ambiente e degli obiettivi assegnati.
+>La principale differenza consiste quindi nel **livello di autonomia**: mentre un programma tradizionale esegue istruzioni predefinite, un **agente sceglie dinamicamente il comportamento** più appropriato in funzione dello stato dell'ambiente e degli obiettivi assegnati.
 
 
 ---
@@ -549,18 +550,6 @@ Il `Maintenance Agent` non è un semplice inoltro di messaggi perché:
 7. riceve l'esito delle azioni;
 8. aggiorna lo stato interno dopo il feedback.
 
-```mermaid
-stateDiagram-v2
-    [*] --> NO_ACTION
-    NO_ACTION --> MONITOR: rischio >= 0.20
-    MONITOR --> REDUCE_SPEED: rischio >= 0.45
-    REDUCE_SPEED --> REQUEST_INSPECTION: rischio >= 0.65
-    REQUEST_INSPECTION --> EMERGENCY_STOP: rischio >= 0.85
-    EMERGENCY_STOP --> REQUEST_INSPECTION: rischio diminuisce
-    REQUEST_INSPECTION --> REDUCE_SPEED: recupero
-    REDUCE_SPEED --> MONITOR: recupero
-    MONITOR --> NO_ACTION: condizioni normali
-```
 
 
 ---

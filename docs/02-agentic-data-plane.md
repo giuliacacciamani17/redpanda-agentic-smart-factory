@@ -37,11 +37,13 @@ Il **Control Plane** e il **Data Plane** svolgono funzioni differenti.
 
 In forma sintetica:
 
-```text
-Control Plane
-Definisce come il sistema deve funzionare.
 
-Data Plane
+**`Control Plane`**
+```text
+Definisce come il sistema deve funzionare.
+```
+**`Data Plane`**
+```text
 Trasporta ciò che accade durante il funzionamento.
 ```
 
@@ -53,12 +55,6 @@ Un esempio di configurazione può essere:
 STATE_WINDOW_SIZE: "5"
 CONTROLLER_MODE: MIXED
 ```
-
-Questi valori definiscono come devono comportarsi i componenti.
-
-La distinzione può essere riassunta così:
-
-> Le configurazioni del Control Plane stabiliscono come il sistema deve funzionare. Il Data Plane trasporta ciò che accade mentre il sistema è in funzione.
 
 ---
 
@@ -108,7 +104,7 @@ Per questi motivi il Data Plane è ancora un'area attiva di ricerca e sviluppo.
 
 Un **Agentic Data Plane** è un'evoluzione del Data Plane progettato per sostenere il ciclo operativo di uno o più **agenti software**.
 
-L'idea fondamentale è che non basta più movimentare i dati: bisogna fornire agli agenti l'accesso sicuro, controllato e contestualizzato alle informazioni e alle azioni che possono eseguire.  
+L'idea fondamentale è che **non basta più movimentare i dati**: bisogna fornire agli agenti l'**accesso sicuro**, **controllato** e **contestualizzato** alle informazioni e alle azioni che possono eseguire.  
 
 In pratica, un Agentic Data Plane diventa l'infrastruttura che collega:
 
@@ -145,7 +141,6 @@ Un Agentic Data Plane introduce funzionalità aggiuntive rispetto a un Data Plan
 | Trasporta ed elabora dati | Coordina dati, strumenti e agenti AI |
 | Lavora su flussi di rete | Lavora su flussi decisionali e operativi |
 | Segue istruzioni del Control Plane | Supporta agenti autonomi che prendono decisioni |
-| Focus sulle prestazioni | Focus su prestazioni, governance e autonomia |
 | Gestisce traffico dati | Gestisce dati, strumenti, permessi e azioni degli agenti |
 
 
@@ -201,7 +196,7 @@ Tuttavia, nelle moderne architetture distribuite e negli Agentic Data Plane, **b
 - il disaccoppiamento tra sistemi e agenti;
 - persistenza degli eventi.
 
-Broker si occupa di gestire lo scambio tra producer e consumer.
+Broker si occupa di **gestire lo scambio** tra producer e consumer.
 
 ```text
 Producer
@@ -211,7 +206,7 @@ Redpanda
 Consumer
 ```
 
-Data Plane è invece un concetto architetturale più ampio, si occupa della movimentazione e della gestione operativa dei dati tra i componenti del sistema.
+Data Plane è invece un **concetto architetturale** più ampio, si occupa della movimentazione e della gestione operativa dei dati tra i componenti del sistema.
 Può essere composto da:
 
 ```text
