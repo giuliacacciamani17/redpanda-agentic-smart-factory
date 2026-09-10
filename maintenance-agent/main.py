@@ -140,7 +140,7 @@ def get_machine_state(
 
     return machine_states[machine_id]
 
-
+# Usato nel topic factory.agent-decision
 def create_decision_event(
     telemetry: dict[str, Any],
     state: MachineState,
@@ -182,6 +182,7 @@ def create_decision_event(
     }
 
 
+# Usata nel topic factory.commands
 def create_command_event(
     decision: dict[str, Any],
 ) -> dict[str, Any]:
@@ -370,7 +371,7 @@ def process_command_result(
         flush=True,
     )
 
-
+# Parte di producer dell'agente per poter generare decisioni o feedback
 def process_message(
     topic: str,
     message_value: bytes,
