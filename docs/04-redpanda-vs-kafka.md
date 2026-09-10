@@ -2,7 +2,7 @@
 
 Redpanda e Apache Kafka sono piattaforme di **event streaming distribuito** in grado di gestire flussi di eventi in tempo reale e svolgere il ruolo di infrastruttura per la comunicazione asincrona tra applicazioni, microservizi e sistemi distribuiti.
 
-> **Idea chiave:**: Redpanda nasce infatti con l'obiettivo di offrire un'esperienza **compatibile con Kafka**, semplificando al contempo la gestione dell'infrastruttura e migliorando le prestazioni.
+> **Idea chiave**: Redpanda nasce infatti con l'obiettivo di offrire un'esperienza **compatibile con Kafka**, semplificando al contempo la gestione dell'infrastruttura e migliorando le prestazioni.
 
 ---
 
@@ -245,7 +245,7 @@ Questo rende più semplice dimostrare il funzionamento del Maintenance Agent.
 I principali vantaggi osservati nel progetto sono:
 
 1. avvio locale semplice tramite Docker Compose;
-2. compatibilità con il client Python `confluent-kafka`;;
+2. compatibilità con il client Python `confluent-kafka`;
 3. interfaccia grafica tramite Redpanda Console;
 4. visualizzazione immediata dei messaggi JSON;
 5. controllo di partizioni e offset;
