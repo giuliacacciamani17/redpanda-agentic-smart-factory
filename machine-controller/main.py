@@ -144,7 +144,7 @@ def publish_result(
 
     producer.poll(0)
 
-
+# elabora il singolo evento, lo valida e chiede al controller di eseguirlo
 def process_command(
     message_value: bytes,
     producer: Producer,
