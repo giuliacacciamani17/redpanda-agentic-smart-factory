@@ -30,3 +30,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.swp
+
+# Script
+.next-correlation-id
